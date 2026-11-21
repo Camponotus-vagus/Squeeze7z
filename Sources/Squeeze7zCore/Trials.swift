@@ -213,6 +213,43 @@ struct Job: Sendable {
         var chunkBytes: Int64? = nil
         /// Saving shown until enough has been written to measure one (the media probe).
         var prior: Double? = nil
+        /// Size of the source (archive or folder): the estimate is the share of it that the finished archive
+        /// will save, as in the final result. A source that is itself compressed saves less than its raw data.
+        var originalBytes: Int64? = nil
+        /// Raw bytes that later blocks of the same layout compress, taken at this run's ratio.
+        var pendingRawBytes: Int64 = 0
+        /// Expected compressed size of parts still to come with their own estimate (the media block).
+        var pendingBytes: Int64 = 0
+    }
+
+    /// Share of `original` the finished archive should save. The ratio compressed/raw of this run comes from
+    /// what has been written (whole chunks for a chunked block, everything read for a single stream), else from
+    /// `prior`. The archive is projected as what was there before the run (`base`), this run and the parts to
+    /// come. Without `original`, the share saved on this run's raw data.
+    static func estimatedSaving(written: Int64, base: Int64, input: Int64, fraction: Double, chunk: Int64?,
+                                prior: Double?, pendingRaw: Int64 = 0, pending: Int64 = 0,
+                                original: Int64?) -> Double? {
+        guard input > 0 else { return nil }
+        var ratio: Double?
+        if written > 0, let chunk, chunk > 0 {
+            let chunks = Double((input + chunk - 1) / chunk)
+            let perChunk = Double(chunk) * (1 - (prior ?? 0))
+            let complete = min(max((Double(written) / perChunk).rounded(), 1), chunks)
+            ratio = Double(written) / min(complete * Double(chunk), Double(input))
+        } else if written > 0, chunk == nil, Double(input) * fraction > 16 * 1_048_576 {
+            ratio = Double(written) / (Double(input) * fraction)
+        } else if let prior {
+            ratio = 1 - prior
+        }
+        guard let ratio else { return nil }
+        let saving: Double
+        if let original, original > 0 {
+            let projected = Double(base) + ratio * Double(input + pendingRaw) + Double(pending)
+            saving = 1 - projected / Double(original)
+        } else {
+            saving = 1 - ratio
+        }
+        return min(max(saving, -0.5), 1)
     }
 
     /// Turns 7zz progress lines into `.stepProgress` events.
@@ -237,20 +274,13 @@ struct Job: Sendable {
                 // compressed: better none than a stale one.
                 if plan.step != .verifying, (line.files ?? 0) >= total, fraction < 1 { currentFile = nil }
             }
-            var saving = plan.prior
-            if let output = plan.output, let input = plan.inputBytes, input > 0 {
+            var saving: Double?
+            if let output = plan.output, let input = plan.inputBytes {
                 let written = max(Job.fileSize(output), Job.fileSize(output.appendingPathExtension("tmp"))) - base
-                if written > 0, let chunk = plan.chunkBytes, chunk > 0 {
-                    let chunks = Double((input + chunk - 1) / chunk)
-                    let perChunk = Double(chunk) * (1 - (plan.prior ?? 0))
-                    let complete = min(max((Double(written) / perChunk).rounded(), 1), chunks)
-                    let covered = min(complete * Double(chunk), Double(input))
-                    saving = 1 - Double(written) / covered
-                } else if written > 0, plan.chunkBytes == nil {
-                    let read = Double(input) * fraction
-                    if read > 16 * 1_048_576 { saving = 1 - Double(written) / read }
-                }
-                saving = saving.map { min(max($0, -0.5), 1) }
+                saving = Job.estimatedSaving(written: max(written, 0), base: base, input: input, fraction: fraction,
+                                             chunk: plan.chunkBytes, prior: plan.prior,
+                                             pendingRaw: plan.pendingRawBytes, pending: plan.pendingBytes,
+                                             original: plan.originalBytes)
             }
             emit(.stepProgress(StepProgress(step: plan.step, fraction: fraction, filesDone: filesDone,
                                             filesTotal: plan.files, currentFile: currentFile,

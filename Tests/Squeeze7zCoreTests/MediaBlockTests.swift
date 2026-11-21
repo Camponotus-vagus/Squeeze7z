@@ -166,4 +166,31 @@ import Testing
         let listing = ProcessOutput(exitCode: 0, standardOutput: Data("Path = a\u{8}b.txt\n".utf8), standardError: Data())
         #expect(listing.outputText == "Path = a\u{8}b.txt\n")
     }
+
+    // MARK: Live saving estimate
+
+    @Test func estimateIsAgainstTheOriginalSize() {
+        let mb: Int64 = 1 << 20
+        let chunk: Int64 = 254 * mb
+        // A 7z of JPEGs: 11,450 MB of photos packed into 10,630 MB. Three chunks written, at 92.8% each.
+        let written = Int64(Double(3 * chunk) * 0.928)
+        let fromSource = Job.estimatedSaving(written: written, base: 0, input: 11_450 * mb, fraction: 0.4, chunk: chunk,
+                                             prior: 0.07, original: 10_630 * mb)
+        let raw = Job.estimatedSaving(written: written, base: 0, input: 11_450 * mb, fraction: 0.4, chunk: chunk,
+                                      prior: 0.07, original: nil)
+        // Against the raw photos the run saves 7.2%; against the 7z it came from, almost nothing.
+        #expect(abs((raw ?? 0) - 0.072) < 0.001)
+        #expect(abs(fromSource ?? 1) < 0.01)
+        // A folder: original and raw data are the same bytes, so both readings agree.
+        let folder = Job.estimatedSaving(written: written, base: 0, input: 11_450 * mb, fraction: 0.4, chunk: chunk,
+                                         prior: 0.07, original: 11_450 * mb)
+        #expect(abs((folder ?? 0) - 0.072) < 0.001)
+        // What is already in the archive (base) and the parts still to come count toward the projection.
+        let withRest = Job.estimatedSaving(written: 50 * mb, base: 10 * mb, input: 200 * mb, fraction: 0.5, chunk: nil,
+                                           prior: nil, pending: 40 * mb, original: 400 * mb)
+        #expect(abs((withRest ?? 0) - 0.625) < 0.001)   // 10 + 0.5 x 200 + 40 = 150 MB of 400
+        // Nothing written and no prior: no estimate.
+        #expect(Job.estimatedSaving(written: 0, base: 0, input: 200 * mb, fraction: 0.5, chunk: nil, prior: nil,
+                                    original: 400 * mb) == nil)
+    }
 }

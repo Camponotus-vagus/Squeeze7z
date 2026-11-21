@@ -336,6 +336,8 @@ public struct ArchiveOptimizer: Sendable {
         if !mode.runsTrials, let baseSpec = baselines.first {
             job.emit(.phase(.baseline))
             let layerDirectories = media == nil ? directoryStage : nil
+            // Expected size of the media block, added to the live estimate of the layouts built before it.
+            let mediaEstimate = media.map { Int64(Double($0.bytes) * (1 - $0.probeSaving)) } ?? 0
             var restList = allList
             if media != nil {
                 restList = job.listsDir.appendingPathComponent("rest.txt")
@@ -346,7 +348,8 @@ public struct ArchiveOptimizer: Sendable {
             let baselineBlocks = restPaths.isEmpty ? [] : [Job.Block(
                 list: restList, spec: baseSpec, autoFilters: true,
                 progress: Job.ProgressPlan(step: .compressing, files: restPaths.count, inputBytes: restBytes,
-                                           output: baselineURL))]
+                                           output: baselineURL, originalBytes: originalBytes,
+                                           pendingBytes: mediaEstimate))]
             let baselineName = restPaths.isEmpty ? "parallel media block" : "whole-archive \(baseSpec)" + suffix
             @Sendable func buildBaselineLayer() async throws -> Int64 {
                 try await job.buildLayered(base: nil, blocks: baselineBlocks, directories: layerDirectories, into: baselineURL)
@@ -371,12 +374,17 @@ public struct ArchiveOptimizer: Sendable {
                 var splitBlocks = [Job.Block(
                     list: plan.textList, spec: plan.textSpec, autoFilters: false,
                     progress: concurrent ? nil : Job.ProgressPlan(step: .compressing, files: plan.text.files.count,
-                                                                  inputBytes: plan.text.totalBytes, output: splitURL))]
+                                                                  inputBytes: plan.text.totalBytes, output: splitURL,
+                                                                  originalBytes: originalBytes,
+                                                                  pendingRawBytes: plan.rest?.totalBytes ?? 0,
+                                                                  pendingBytes: mediaEstimate))]
                 if let list = plan.restList, let rest = plan.rest {
                     splitBlocks.append(Job.Block(
                         list: list, spec: plan.restSpec, autoFilters: true,
                         progress: concurrent ? nil : Job.ProgressPlan(step: .compressing, files: rest.files.count,
-                                                                      inputBytes: rest.totalBytes, output: splitURL)))
+                                                                      inputBytes: rest.totalBytes, output: splitURL,
+                                                                      originalBytes: originalBytes,
+                                                                      pendingBytes: mediaEstimate)))
                 }
                 let blocks = splitBlocks
                 @Sendable func buildSplitLayer() async throws -> Int64 {
@@ -411,7 +419,7 @@ public struct ArchiveOptimizer: Sendable {
                 try await job.appendDirectories(directoryStage, to: target)
                 let plan = Job.ProgressPlan(step: .compressingMedia, files: media.files.count, inputBytes: media.bytes,
                                             output: target, chunkBytes: media.chunkBytes,
-                                            prior: media.probeSaving)
+                                            prior: media.probeSaving, originalBytes: originalBytes)
                 try await job.tool.runChecked(job.addArguments(archive: target, list: media.list, spec: media.spec,
                                                                filtersOff: true, threads: job.soloThreadSwitch),
                                               currentDirectory: job.root, progress: job.progressHandler(plan))
@@ -430,7 +438,7 @@ public struct ArchiveOptimizer: Sendable {
                 try await job.buildBaseline(spec: specs[i], list: allList, hasEntries: !allPaths.isEmpty,
                                             directories: directoryStage, into: urls[i],
                                             progress: Job.ProgressPlan(step: .compressing, files: allPaths.count,
-                                                                       inputBytes: totalBytes, output: urls[i]))
+                                                                       inputBytes: totalBytes, output: urls[i], originalBytes: originalBytes))
                 return Job.fileSize(urls[i])
             }, onResult: { i, size in
                 archives.append((urls[i], size, "whole-archive \(specs[i])"))

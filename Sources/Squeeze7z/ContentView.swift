@@ -245,11 +245,12 @@ private struct SavedCell: View {
                 .foregroundStyle(.green)
         } else if job.status == .running, !job.cancelRequested, let saving = job.step?.estimatedSaving {
             // Live estimate while compressing: grey, with "≈", until the verified result replaces it.
-            Text("≈ \(Fmt.percent(saving))")
+            // Below zero would only mean "no gain": the original is kept then, so 0% says it plainly.
+            Text("≈ \(Fmt.percent(max(saving, 0)))")
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
                 .contentTransition(.numericText())
-                .help("Estimated from the part compressed so far. The exact figure appears when the archive has been verified.")
+                .help("Estimated share of the original size the new archive will save, from the part compressed so far. The exact figure appears when the archive has been verified.")
         } else {
             Text("-").foregroundStyle(.tertiary)
         }
