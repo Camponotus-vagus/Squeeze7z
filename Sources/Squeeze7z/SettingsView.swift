@@ -93,7 +93,7 @@ struct GeneralSettings: View {
             }
         }
         .formStyle(.grouped)
-        .frame(height: updates.isAvailable ? 540 : 440)
+        .fitsContent()
         .animation(.smooth(duration: 0.25), value: model.settings.outputMode)
     }
 
@@ -173,7 +173,7 @@ struct CompressionSettings: View {
             }
         }
         .formStyle(.grouped)
-        .frame(height: 690)
+        .fitsContent()
     }
 
     private var minGroupKiB: Binding<Int> {
@@ -231,7 +231,7 @@ struct PerformanceSettings: View {
             }
         }
         .formStyle(.grouped)
-        .frame(height: 270)
+        .fitsContent()
     }
 
     private func memoryHint(_ s: OptimizerSettings) -> String {
@@ -243,6 +243,36 @@ struct PerformanceSettings: View {
         let text = "Worst-case LZMA memory: about \(Fmt.bytes(peak)) (dictionary × concurrent trials × parallel jobs). This Mac has \(Fmt.bytes(installed))."
         return peak > installed / 2 ? text + " Consider lowering the dictionary or parallelism." : text
     }
+}
+
+/// Sizes a grouped form to the height of its rows, so a tab shows every setting without scrolling and without
+/// empty space; the window follows the tab. Rows that appear or disappear (a footer, a dependent stepper)
+/// resize it too. Taller than the screen allows, the form scrolls.
+private struct FitsContent: ViewModifier {
+    @State private var height: CGFloat = 300
+
+    func body(content: Content) -> some View {
+        content
+            .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                geometry.contentSize.height.rounded(.up)
+            } action: { _, newHeight in
+                // Applied on the next turn of the run loop: changing the frame inside the scroll view's own
+                // layout pass makes AppKit lay the window out again and again until it gives up.
+                guard newHeight > 0, abs(newHeight - height) >= 1 else { return }
+                Task { @MainActor in height = newHeight }
+            }
+            // The content size leaves out the form's bottom margin; 10 points match the one at the top.
+            .frame(height: min(height + 10, Self.maxHeight))
+    }
+
+    /// Room on the screen below the title bar and toolbar of the Settings window.
+    private static var maxHeight: CGFloat {
+        max(300, (NSScreen.main?.visibleFrame.height ?? 800) - 120)
+    }
+}
+
+private extension View {
+    func fitsContent() -> some View { modifier(FitsContent()) }
 }
 
 private struct StepperRow: View {
