@@ -86,38 +86,58 @@ enum FolderStage {
         guard mkdir(destination, 0o700) == 0 else {
             throw OptimizerError.toolFailed(command: "mkdir", exitCode: errno, stderr: destination)
         }
-        var copiedForReal = false
-        for entry in listing.entries {
-            if Task.isCancelled { throw OptimizerError.cancelled }
-            let from = source + "/" + entry.path
+        for entry in listing.entries where entry.kind == .directory {
             let to = destination + "/" + entry.path
-            switch entry.kind {
-            case .directory:
-                guard mkdir(to, 0o700) == 0 else {
-                    throw OptimizerError.toolFailed(command: "mkdir", exitCode: errno, stderr: to)
-                }
-            case .file, .link:
-                if clonefile(from, to, UInt32(CLONE_NOFOLLOW)) != 0 {
-                    let code = errno
-                    // Only "this volume cannot clone" falls back to a copy; anything else is the real error.
-                    guard code == EXDEV || code == ENOTSUP else { throw failure(entry.path, code) }
-                    if !copiedForReal {
-                        try beforeRealCopy()
-                        copiedForReal = true
-                    }
-                    if entry.kind == .link {
-                        var buffer = [CChar](repeating: 0, count: Int(PATH_MAX) + 1)
-                        let n = readlink(from, &buffer, Int(PATH_MAX))
-                        guard n >= 0 else { throw failure(entry.path, errno) }
-                        buffer[n] = 0
-                        guard symlink(buffer, to) == 0 else { throw failure(entry.path, errno) }
-                    } else if copyfile(from, to, nil, copyfile_flags_t(COPYFILE_ALL | COPYFILE_NOFOLLOW | COPYFILE_EXCL)) != 0 {
-                        throw failure(entry.path, errno)
-                    }
-                }
+            guard mkdir(to, 0o700) == 0 else {
+                throw OptimizerError.toolFailed(command: "mkdir", exitCode: errno, stderr: to)
+            }
+        }
+        if Task.isCancelled { throw OptimizerError.cancelled }
+        // Files and links are cloned in parallel (one clonefile call each; a tree of small files spends most of its
+        // time in those calls). Entries the volume cannot clone are copied afterwards, one by one.
+        let entries = listing.entries.filter { $0.kind != .directory }
+        final class Outcome: @unchecked Sendable {
+            let lock = NSLock()
+            var toCopy: [Int] = []
+            var failure: OptimizerError?
+        }
+        let outcome = Outcome()
+        DispatchQueue.concurrentPerform(iterations: entries.count) { index in
+            let entry = entries[index]
+            let to = destination + "/" + entry.path
+            if clonefile(source + "/" + entry.path, to, UInt32(CLONE_NOFOLLOW)) == 0 {
                 // A file locked in Finder (uchg) would keep the work folder from being removed.
                 FileTree.clearLockFlags(to)
+                return
             }
+            let code = errno
+            outcome.lock.lock()
+            defer { outcome.lock.unlock() }
+            // Only "this volume cannot clone" falls back to a copy; anything else is the real error.
+            if code == EXDEV || code == ENOTSUP {
+                outcome.toCopy.append(index)
+            } else if outcome.failure == nil {
+                outcome.failure = failure(entry.path, code)
+            }
+        }
+        if let failure = outcome.failure { throw failure }
+        if Task.isCancelled { throw OptimizerError.cancelled }
+        if !outcome.toCopy.isEmpty { try beforeRealCopy() }
+        for index in outcome.toCopy.sorted() {
+            if Task.isCancelled { throw OptimizerError.cancelled }
+            let entry = entries[index]
+            let from = source + "/" + entry.path
+            let to = destination + "/" + entry.path
+            if entry.kind == .link {
+                var buffer = [CChar](repeating: 0, count: Int(PATH_MAX) + 1)
+                let n = readlink(from, &buffer, Int(PATH_MAX))
+                guard n >= 0 else { throw failure(entry.path, errno) }
+                buffer[n] = 0
+                guard symlink(buffer, to) == 0 else { throw failure(entry.path, errno) }
+            } else if copyfile(from, to, nil, copyfile_flags_t(COPYFILE_ALL | COPYFILE_NOFOLLOW | COPYFILE_EXCL)) != 0 {
+                throw failure(entry.path, errno)
+            }
+            FileTree.clearLockFlags(to)
         }
         // Directory modes and times last, children first: a read-only folder cannot be filled afterwards.
         for entry in listing.entries.reversed() where entry.kind == .directory {

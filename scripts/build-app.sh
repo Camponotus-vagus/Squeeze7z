@@ -11,7 +11,7 @@ set -euo pipefail
 
 readonly APP_NAME="Squeeze7z"
 readonly BUNDLE_ID="org.zermat.squeeze7z"
-readonly VERSION="0.1.0"
+readonly VERSION="0.1.1"
 readonly BUILD_NUMBER="1"
 readonly MIN_MACOS="26.0"
 readonly COPYRIGHT="Copyright 2026 Zermat. 7-Zip engine by Igor Pavlov (LGPL, unRAR restriction)."

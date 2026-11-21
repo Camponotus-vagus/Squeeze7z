@@ -44,7 +44,8 @@ enum TreeScanner {
         var isSymlink: Bool
     }
 
-    /// Walks `root` without following symlinks and computes CRC32 of every file (4 files at a time).
+    /// Walks `root` without following symlinks and computes CRC32 of every file (one file per core at a time,
+    /// at least 4).
     /// Special files (sockets, devices, FIFOs) are ignored.
     static func scan(root: URL) async throws -> TreeSnapshot {
         var items: [Item] = []
@@ -72,7 +73,8 @@ enum TreeScanner {
                     return (item.path, .init(size: item.size, crc: crc, isSymlink: false))
                 }
             }
-            while running < 4, let next = iterator.next() {
+            let width = max(4, ProcessInfo.processInfo.activeProcessorCount)
+            while running < width, let next = iterator.next() {
                 start(next, in: &group)
                 running += 1
             }

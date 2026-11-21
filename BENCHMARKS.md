@@ -48,8 +48,23 @@ On text the sizes did not change and Smart got 17 to 28% faster. On the wallpape
 
 Raw data: [docs/bench-data/parallel.csv](docs/bench-data/parallel.csv).
 
+## Run 3: a folder of small JPEGs
+
+A user's folder of 24,376 small JPEG photos (583 MB, median file 22 KB) came out 3.0% smaller with 0.1.0, where the very first version, with one LZMA2 stream, had reached 3.3%. These files still compress: their headers and Huffman tables are nearly identical, and LZMA2 learns the image data as it goes. Every independent chunk starts that learning from scratch, so five chunks lost about 1.9 MB against one stream.
+
+Fast and Smart now compress about 32 MB of the media files, sampled through the whole list, before choosing the chunks. When the sample shrinks by 1% or more, the block gets as many chunks as `7zz -mx9` makes (one per 256 MB), all of equal size, with `lc=4`. Otherwise it keeps one chunk per two cores. The same run removed three costs that grow with the file count: the grouping copied each group's file list on every file, the folder was cloned one file at a time, and the media block was copied every time 7zz appended to the archive.
+
+| Build | Time | Bytes | Saved |
+|---|---|---|---|
+| `7zz -mx9` (no verification) | 16.8 s | 564,243,687 | 3.15% |
+| Squeeze7z 0.1.0, Smart | 21.0 s | 565,221,632 | 2.98% |
+| Squeeze7z now, Smart | 20.5 s | 564,090,913 | 3.18% |
+| One LZMA2 stream (first version) | about 37 s of compression | 563,356,417 | 3.30% |
+
+Squeeze7z now spends 13 s compressing against 17 s for `-mx9`, and is smaller. The remaining 7 s are the clone of the folder with a CRC of every file (2.3 s) and the final check (`7zz t` and the comparison of every file, 4.9 s), which 7-Zip does not do. The output was extracted with 7zz and compared with the folder: identical. Run 2 was repeated with these changes: same bytes on every input, times within noise.
+
 ## Limits
 
-- Fast and Smart can now be a few KB larger than `-mx9` on photos and videos. On one user's folder of JPEGs the saving went from 3.3% to 3.0%. Chunks cannot refer to each other, so near-identical photos stored in different chunks lose the match. The setting "Compress photos, videos and zips on all cores", or `--single-stream` on the command line, goes back to a single stream.
+- Fast and Smart can be a few KB larger than `-mx9` on photos and videos that do not compress at all (3.2 KB on 623 MB of wallpapers). Chunks cannot refer to each other, so identical photos stored more than one chunk apart are not matched. The setting "Compress photos, videos and zips on all cores", or `--single-stream` on the command line, goes back to a single stream.
 - Times come from single runs on one machine. They show the order of magnitude, not a precise ratio.
 - Only names, sizes, contents and links of the extracted files were compared. Dates, permissions and extended attributes were not.

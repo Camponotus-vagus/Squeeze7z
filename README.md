@@ -47,7 +47,7 @@ A little, and how much depends on what you compress. The comparison below is aga
   <img src="docs/images/time-light.svg" width="760" alt="Bar chart of compression times. Photos and videos: 7-Zip 12.7 s, Squeeze7z 9.6 s. Photos with headers and an app: 5.9 s and 3.5 s. SDK headers: 10.6 s and 16.6 s. Silesia: 31.6 s and 41.2 s">
 </picture>
 
-- Faster on photos and videos: 7-Zip at `-mx9` compresses a few hundred MB as one stream, which keeps two cores busy. Squeeze7z splits already compressed files into chunks that every core works on, for an archive a few KB larger at most.
+- Faster on photos and videos: 7-Zip at `-mx9` compresses a few hundred MB as one stream, which keeps two cores busy. Squeeze7z splits already compressed files into chunks that every core works on, for an archive a few KB larger at most. A quick test on a sample comes first: when the files still compress (thousands of small JPEGs with near-identical headers, for example), it uses as many chunks as `-mx9` would, of equal size, so the archive stays smaller than with `-mx9` and the compression takes no longer.
 - Slower on text: 1.3 to 1.6 times the time of 7-Zip on inputs of tens of MB or more. That is the price of the PPMd block, which runs on one core, plus the check of every file at the end.
 
 The numbers, the inputs and the method are in [BENCHMARKS.md](BENCHMARKS.md).

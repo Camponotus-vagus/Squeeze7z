@@ -211,8 +211,7 @@ public struct ArchiveOptimizer: Sendable {
         // Fast and Smart modes: already compressed files get their own block of parallel LZMA2 chunks, and the
         // baseline (and the Smart split) cover the rest of the tree.
         let physicalMemory = ProcessInfo.processInfo.physicalMemory
-        let media = try MediaBlock.make(groups: groups, settings: settings, threads: job.soloThreads,
-                                        physicalMemory: physicalMemory, listsDir: job.listsDir)
+        let media = try await MediaBlock.make(groups: groups, snapshot: snapshot, job: job, physicalMemory: physicalMemory)
         let mediaFiles = Set(media?.files ?? [])
         let restGroups = media == nil ? groups : groups.filter { $0.category != .compressed }
         let restPaths = media == nil ? allPaths : allPaths.filter { !mediaFiles.contains($0) }
@@ -327,20 +326,12 @@ public struct ArchiveOptimizer: Sendable {
             }
         }
 
-        // 6. Fast and Smart: the media block once, then the baseline and the Smart split on top of it.
+        // 6. Fast and Smart: the baseline and the Smart split of everything but the media block, side by side;
+        // then the directory entries and the media block are appended to the smaller one. 7zz rewrites the whole
+        // archive on every append, so the large media block goes last and is compressed once.
         if !mode.runsTrials, let baseSpec = baselines.first {
             job.emit(.phase(.baseline))
-            var mediaArchive: URL?
-            if let media {
-                let url = job.work.appendingPathComponent("media.7z")
-                try await job.buildLayered(base: nil, blocks: [Job.Block(list: media.list, spec: media.spec, autoFilters: false)],
-                                           directories: nil, into: url)
-                mediaArchive = url
-                job.log("Media block (\(media.files.count) files, \(media.bytes) bytes) as parallel chunks \(media.spec): \(Job.fileSize(url)) bytes")
-                done += 1
-                job.emit(.trialProgress(done: done, total: plannedTotal))
-            }
-            defer { if let mediaArchive { try? FileManager.default.removeItem(at: mediaArchive) } }
+            let layerDirectories = media == nil ? directoryStage : nil
             var restList = allList
             if media != nil {
                 restList = job.listsDir.appendingPathComponent("rest.txt")
@@ -350,15 +341,14 @@ public struct ArchiveOptimizer: Sendable {
             let baselineURL = job.work.appendingPathComponent("baseline_0.7z")
             let baselineBlocks = restPaths.isEmpty ? [] : [Job.Block(list: restList, spec: baseSpec, autoFilters: true)]
             let baselineName = restPaths.isEmpty ? "parallel media block" : "whole-archive \(baseSpec)" + suffix
-            let base = mediaArchive
             @Sendable func buildBaselineLayer() async throws -> Int64 {
-                try await job.buildLayered(base: base, blocks: baselineBlocks, directories: directoryStage, into: baselineURL)
+                try await job.buildLayered(base: nil, blocks: baselineBlocks, directories: layerDirectories, into: baselineURL)
                 return Job.fileSize(baselineURL)
             }
             func recordBaseline(_ size: Int64) {
                 archives.append((baselineURL, size, baselineName))
                 keepSmallest()
-                job.log("Baseline \(baseSpec)\(suffix): \(size) bytes")
+                job.log("Baseline \(baseSpec)\(media == nil ? "" : " (without the media block)"): \(size) bytes")
                 done += 1
                 job.emit(.trialProgress(done: done, total: plannedTotal))
             }
@@ -368,13 +358,13 @@ public struct ArchiveOptimizer: Sendable {
                 if let list = plan.restList { splitBlocks.append(Job.Block(list: list, spec: plan.restSpec, autoFilters: true)) }
                 let blocks = splitBlocks
                 @Sendable func buildSplitLayer() async throws -> Int64 {
-                    try await job.buildLayered(base: base, blocks: blocks, directories: directoryStage, into: splitURL)
+                    try await job.buildLayered(base: nil, blocks: blocks, directories: layerDirectories, into: splitURL)
                     return Job.fileSize(splitURL)
                 }
                 func recordSplit(_ size: Int64) {
                     archives.append((splitURL, size, SmartPlan.strategy + suffix))
                     keepSmallest()
-                    job.log("Smart split (\(plan.text.files.count) text files as PPMd, \(plan.restFileCount) others as LZMA2)\(suffix): \(size) bytes")
+                    job.log("Smart split (\(plan.text.files.count) text files as PPMd, \(plan.restFileCount) others as LZMA2)\(media == nil ? "" : " without the media block"): \(size) bytes")
                     done += 1
                     job.emit(.trialProgress(done: done, total: plannedTotal))
                 }
@@ -396,6 +386,18 @@ public struct ArchiveOptimizer: Sendable {
                 }
             } else {
                 recordBaseline(try await buildBaselineLayer())
+            }
+            if let media, !archives.isEmpty {
+                // keepSmallest left one archive: both layouts get the same media block, so the smaller one wins.
+                let target = archives[0].url
+                try await job.appendDirectories(directoryStage, to: target)
+                try await job.tool.runChecked(job.addArguments(archive: target, list: media.list, spec: media.spec,
+                                                               filtersOff: true, threads: job.soloThreadSwitch),
+                                              currentDirectory: job.root)
+                archives[0].size = Job.fileSize(target)
+                job.log("Media block (\(media.files.count) files, \(media.bytes) bytes) as parallel chunks \(media.spec): archive \(archives[0].size) bytes")
+                done += 1
+                job.emit(.trialProgress(done: done, total: plannedTotal))
             }
         } else if !baselines.isEmpty {
         // 6'. Whole-archive baselines (modes with trials)
@@ -488,7 +490,7 @@ public struct ArchiveOptimizer: Sendable {
     /// the trials in flight (already compressed groups produce full-size ones; half a tree per trial is assumed;
     /// the trials of family blocks run after those of the groups and are bounded the same way).
     func requiredSpace(unpacked: Int64) -> Int64 {
-        // Smart: the media block, plus the baseline and the split built on copies of it at the same time.
+        // Smart: the baseline and the split are built at the same time, then the media block is appended to one.
         var factor = settings.mode == .smart ? 4.0 : 3.0
         if settings.mode.runsTrials && settings.samplingLevel == 0 {
             factor += 0.5 * Double(settings.lowCPU ? 1 : max(1, settings.concurrentTrials))
