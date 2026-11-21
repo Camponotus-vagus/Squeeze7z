@@ -103,7 +103,7 @@ Requirements: Xcode 27 or a Swift 6.4 toolchain, macOS 26, Apple Silicon.
 git clone https://github.com/Camponotus-vagus/Squeeze7z.git
 cd Squeeze7z
 swift test                       # run the tests
-scripts/build-app.sh --install   # build/Squeeze7z.app, copied to ~/Applications
+scripts/build-app.sh --install   # build/app.noindex/Squeeze7z.app, copied to ~/Applications
 scripts/build-cli.sh             # build/squeeze7z-cli
 ```
 

@@ -48,13 +48,13 @@ log "Testing"
 (cd "${WORK}/src" && swift test >/dev/null)
 log "Building ${VERSION}"
 (cd "${WORK}/src" && scripts/build-app.sh >/dev/null)
-readonly APP="${WORK}/src/build/Squeeze7z.app"
+readonly APP="${WORK}/src/build/app.noindex/Squeeze7z.app"
 [[ "$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "${APP}/Contents/Info.plist")" == "${VERSION}" ]] \
     || fail "the built app is not version ${VERSION}"
 if grep -rlaq -e "${HOME}" -e "/private/var/folders" "${APP}"; then fail "the app contains a path of this Mac"; fi
 
 readonly ZIP="${WORK}/Squeeze7z.zip"
-(cd "${WORK}/src/build" && ditto -c -k --sequesterRsrc --keepParent Squeeze7z.app "${ZIP}")
+(cd "${WORK}/src/build/app.noindex" && ditto -c -k --sequesterRsrc --keepParent Squeeze7z.app "${ZIP}")
 SIGNATURE="$("${SIGN_UPDATE}" --account "${KEY_ACCOUNT}" "${ZIP}")"
 readonly SIGNATURE
 SHA="$(shasum -a 256 "${ZIP}" | cut -d' ' -f1)"

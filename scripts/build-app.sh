@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds the release app bundle build/Squeeze7z.app with the vendored 7zz engine,
+# Builds the release app bundle build/app.noindex/Squeeze7z.app with the vendored 7zz engine,
 # the app icon (Icon Composer document compiled with actool, plus an .icns fallback)
 # and the 7-Zip license, then ad-hoc signs it.
 #
@@ -24,7 +24,8 @@ readonly COPYRIGHT="Copyright 2026 Zermat. 7-Zip engine by Igor Pavlov (LGPL, un
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly REPO_ROOT
 readonly BUILD_DIR="${REPO_ROOT}/build"
-readonly APP_DIR="${BUILD_DIR}/${APP_NAME}.app"
+# A folder named *.noindex keeps Spotlight from listing this working copy next to the installed app.
+readonly APP_DIR="${BUILD_DIR}/app.noindex/${APP_NAME}.app"
 readonly CONTENTS_DIR="${APP_DIR}/Contents"
 readonly MACOS_DIR="${CONTENTS_DIR}/MacOS"
 readonly FRAMEWORKS_DIR="${CONTENTS_DIR}/Frameworks"
