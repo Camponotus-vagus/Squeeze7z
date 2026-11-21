@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="350" viewBox="0 0 760 350">
+<rect width="760" height="350" fill="#ffffff"/>
+<text x="20" y="30" fill="#0b0b0b" font-size="16" font-weight="600" text-anchor="start" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">Time to compress, seconds (shorter is faster)</text>
+<text x="20" y="50" fill="#52514e" font-size="12" font-weight="400" text-anchor="start" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">MacBook Air M5, 10 cores. Squeeze7z in Smart mode, including its check of every file.</text>
+<rect x="20" y="62" width="12" height="12" rx="3" fill="#2a78d6"/>
+<text x="38" y="72" fill="#0b0b0b" font-size="12" font-weight="400" text-anchor="start" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">7-Zip -mx9</text>
+<rect x="130" y="62" width="12" height="12" rx="3" fill="#eb6834"/>
+<text x="148" y="72" fill="#0b0b0b" font-size="12" font-weight="400" text-anchor="start" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">Squeeze7z Smart</text>
+<line x1="230.0" y1="84" x2="230.0" y2="320" stroke="#e4e3df" stroke-width="1"/>
+<text x="230.0" y="338" fill="#52514e" font-size="11" font-weight="400" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">0 s</text>
+<line x1="332.22222222222223" y1="84" x2="332.22222222222223" y2="320" stroke="#e4e3df" stroke-width="1"/>
+<text x="332.22222222222223" y="338" fill="#52514e" font-size="11" font-weight="400" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">10 s</text>
+<line x1="434.44444444444446" y1="84" x2="434.44444444444446" y2="320" stroke="#e4e3df" stroke-width="1"/>
+<text x="434.44444444444446" y="338" fill="#52514e" font-size="11" font-weight="400" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">20 s</text>
+<line x1="536.6666666666667" y1="84" x2="536.6666666666667" y2="320" stroke="#e4e3df" stroke-width="1"/>
+<text x="536.6666666666667" y="338" fill="#52514e" font-size="11" font-weight="400" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">30 s</text>
+<line x1="638.8888888888889" y1="84" x2="638.8888888888889" y2="320" stroke="#e4e3df" stroke-width="1"/>
+<text x="638.8888888888889" y="338" fill="#52514e" font-size="11" font-weight="400" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">40 s</text>
+<text x="20" y="105" fill="#0b0b0b" font-size="13" font-weight="400" text-anchor="start" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">Photos and videos</text>
+<text x="20" y="120" fill="#52514e" font-size="11" font-weight="400" text-anchor="start" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">HEIC, MOV, 623 MB</text>
+<path d="M230,92 H355.8222222222222 Q359.8222222222222,92 359.8222222222222,96 V104 Q359.8222222222222,108 355.8222222222222,108 H230 Z" fill="#2a78d6"/>
+<text x="367.8222222222222" y="104" fill="#0b0b0b" font-size="12" font-weight="400" text-anchor="start" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">12.7 s</text>
+<path d="M230,111 H324.1333333333333 Q328.1333333333333,111 328.1333333333333,115 V123 Q328.1333333333333,127 324.1333333333333,127 H230 Z" fill="#eb6834"/>
+<text x="336.1333333333333" y="123" fill="#0b0b0b" font-size="12" font-weight="400" text-anchor="start" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">9.6 s</text>
+<text x="20" y="162" fill="#0b0b0b" font-size="13" font-weight="400" text-anchor="start" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">Photos + headers + app</text>
+<text x="20" y="177" fill="#52514e" font-size="11" font-weight="400" text-anchor="start" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">174 MB</text>
+<path d="M230,149 H286.31111111111113 Q290.31111111111113,149 290.31111111111113,153 V161 Q290.31111111111113,165 286.31111111111113,165 H230 Z" fill="#2a78d6"/>
+<text x="298.31111111111113" y="161" fill="#0b0b0b" font-size="12" font-weight="400" text-anchor="start" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">5.9 s</text>
+<path d="M230,168 H261.77777777777777 Q265.77777777777777,168 265.77777777777777,172 V180 Q265.77777777777777,184 261.77777777777777,184 H230 Z" fill="#eb6834"/>
+<text x="273.77777777777777" y="180" fill="#0b0b0b" font-size="12" font-weight="400" text-anchor="start" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">3.5 s</text>
+<text x="20" y="219" fill="#0b0b0b" font-size="13" font-weight="400" text-anchor="start" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">macOS SDK headers</text>
+<text x="20" y="234" fill="#52514e" font-size="11" font-weight="400" text-anchor="start" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">C, 90 MB</text>
+<path d="M230,206 H334.35555555555555 Q338.35555555555555,206 338.35555555555555,210 V218 Q338.35555555555555,222 334.35555555555555,222 H230 Z" fill="#2a78d6"/>
+<text x="346.35555555555555" y="218" fill="#0b0b0b" font-size="12" font-weight="400" text-anchor="start" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">10.6 s</text>
+<path d="M230,225 H395.68888888888887 Q399.68888888888887,225 399.68888888888887,229 V237 Q399.68888888888887,241 395.68888888888887,241 H230 Z" fill="#eb6834"/>
+<text x="407.68888888888887" y="237" fill="#0b0b0b" font-size="12" font-weight="400" text-anchor="start" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">16.6 s</text>
+<text x="20" y="276" fill="#0b0b0b" font-size="13" font-weight="400" text-anchor="start" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">Silesia corpus</text>
+<text x="20" y="291" fill="#52514e" font-size="11" font-weight="400" text-anchor="start" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">mixed, 202 MB</text>
+<path d="M230,263 H549.0222222222222 Q553.0222222222222,263 553.0222222222222,267 V275 Q553.0222222222222,279 549.0222222222222,279 H230 Z" fill="#2a78d6"/>
+<text x="561.0222222222222" y="275" fill="#0b0b0b" font-size="12" font-weight="400" text-anchor="start" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">31.6 s</text>
+<path d="M230,282 H647.1555555555556 Q651.1555555555556,282 651.1555555555556,286 V294 Q651.1555555555556,298 647.1555555555556,298 H230 Z" fill="#eb6834"/>
+<text x="659.1555555555556" y="294" fill="#0b0b0b" font-size="12" font-weight="400" text-anchor="start" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">41.2 s</text>
+</svg>

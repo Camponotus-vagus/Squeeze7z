@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="328" viewBox="0 0 760 328">
+<rect width="760" height="328" fill="#0d1117"/>
+<text x="20" y="30" fill="#f0efec" font-size="16" font-weight="600" text-anchor="start" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">Smaller than 7-Zip at its maximum preset (-mx9)</text>
+<text x="20" y="50" fill="#c3c2b7" font-size="12" font-weight="400" text-anchor="start" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">Squeeze7z, default Smart mode. Percent of the 7-Zip archive size saved.</text>
+<line x1="230.0" y1="62" x2="230.0" y2="298" stroke="#30302d" stroke-width="1"/>
+<text x="230.0" y="316" fill="#c3c2b7" font-size="11" font-weight="400" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">0%</text>
+<line x1="394.2857142857143" y1="62" x2="394.2857142857143" y2="298" stroke="#30302d" stroke-width="1"/>
+<text x="394.2857142857143" y="316" fill="#c3c2b7" font-size="11" font-weight="400" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">5%</text>
+<line x1="558.5714285714286" y1="62" x2="558.5714285714286" y2="298" stroke="#30302d" stroke-width="1"/>
+<text x="558.5714285714286" y="316" fill="#c3c2b7" font-size="11" font-weight="400" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">10%</text>
+<text x="20" y="81" fill="#f0efec" font-size="13" font-weight="400" text-anchor="start" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">Canterbury corpus</text>
+<text x="20" y="95" fill="#c3c2b7" font-size="11" font-weight="400" text-anchor="start" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">text, 2.8 MB</text>
+<path d="M230,70 H630.1428571428571 Q634.1428571428571,70 634.1428571428571,74 V88 Q634.1428571428571,92 630.1428571428571,92 H230 Z" fill="#d95926"/>
+<text x="642.1428571428571" y="85" fill="#f0efec" font-size="12" font-weight="400" text-anchor="start" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">12.3%</text>
+<text x="20" y="119" fill="#f0efec" font-size="13" font-weight="400" text-anchor="start" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">Python source tree</text>
+<text x="20" y="133" fill="#c3c2b7" font-size="11" font-weight="400" text-anchor="start" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">16 MB</text>
+<path d="M230,108 H620.2857142857142 Q624.2857142857142,108 624.2857142857142,112 V126 Q624.2857142857142,130 620.2857142857142,130 H230 Z" fill="#d95926"/>
+<text x="632.2857142857142" y="123" fill="#f0efec" font-size="12" font-weight="400" text-anchor="start" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">12.0%</text>
+<text x="20" y="157" fill="#f0efec" font-size="13" font-weight="400" text-anchor="start" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">macOS SDK headers</text>
+<text x="20" y="171" fill="#c3c2b7" font-size="11" font-weight="400" text-anchor="start" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">C, 90 MB</text>
+<path d="M230,146 H495.4285714285714 Q499.4285714285714,146 499.4285714285714,150 V164 Q499.4285714285714,168 495.4285714285714,168 H230 Z" fill="#d95926"/>
+<text x="507.4285714285714" y="161" fill="#f0efec" font-size="12" font-weight="400" text-anchor="start" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">8.2%</text>
+<text x="20" y="195" fill="#f0efec" font-size="13" font-weight="400" text-anchor="start" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">Silesia corpus</text>
+<text x="20" y="209" fill="#c3c2b7" font-size="11" font-weight="400" text-anchor="start" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">mixed, 202 MB</text>
+<path d="M230,184 H380.42857142857144 Q384.42857142857144,184 384.42857142857144,188 V202 Q384.42857142857144,206 380.42857142857144,206 H230 Z" fill="#d95926"/>
+<text x="392.42857142857144" y="199" fill="#f0efec" font-size="12" font-weight="400" text-anchor="start" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">4.7%</text>
+<text x="20" y="233" fill="#f0efec" font-size="13" font-weight="400" text-anchor="start" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">Photos + headers + app</text>
+<text x="20" y="247" fill="#c3c2b7" font-size="11" font-weight="400" text-anchor="start" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">174 MB</text>
+<path d="M230,222 H230.0 Q233.28571428571428,222 233.28571428571428,225.28571428571428 V240.71428571428572 Q233.28571428571428,244 230.0,244 H230 Z" fill="#d95926"/>
+<text x="241.28571428571428" y="237" fill="#f0efec" font-size="12" font-weight="400" text-anchor="start" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">0.1%</text>
+<text x="20" y="271" fill="#f0efec" font-size="13" font-weight="400" text-anchor="start" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">Photos and videos</text>
+<text x="20" y="285" fill="#c3c2b7" font-size="11" font-weight="400" text-anchor="start" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">HEIC, MOV, 623 MB</text>
+
+<text x="238.0" y="275" fill="#f0efec" font-size="12" font-weight="400" text-anchor="start" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">same size</text>
+</svg>

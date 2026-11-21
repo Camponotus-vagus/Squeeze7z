@@ -1,0 +1,21 @@
+id,tool,out_bytes,seconds,verify,strategy
+canterbury,7zz-mx9,483895,0.2,,
+canterbury,old-smart,424596,0.7,identical,smart split
+canterbury,new-smart,424596,0.5,identical,smart split
+canterbury,new-fast,483895,0.3,identical,whole-archive LZMA2:d=4m:fb=64
+headers,7zz-mx9,8137992,10.6,,
+headers,old-smart,7468507,20.0,identical,smart split
+headers,new-smart,7468507,16.6,identical,smart split
+headers,new-fast,8137992,13.2,identical,whole-archive LZMA2:d=128m:fb=64
+silesia,7zz-mx9,48688242,31.6,,
+silesia,old-smart,46399135,57.2,identical,smart split
+silesia,new-smart,46399135,41.2,identical,smart split
+silesia,new-fast,48688242,33.7,identical,whole-archive LZMA2:d=256m:fb=64
+mixed,7zz-mx9,172337034,5.9,,
+mixed,old-smart,172337034,6.2,identical,whole-archive LZMA2:d=256m:fb=64
+mixed,new-smart,172169569,3.5,identical,smart split + parallel media block
+mixed,new-fast,172341476,3.0,identical,whole-archive LZMA2:d=16m:fb=64 + parallel media block
+wallpapers,7zz-mx9,652185884,12.7,,
+wallpapers,old-smart,652179190,34.3,identical,whole-archive LZMA2:d=256m:fb=64:c=1g
+wallpapers,new-smart,652189117,9.6,identical,parallel media block
+wallpapers,new-fast,652189117,9.8,identical,parallel media block
