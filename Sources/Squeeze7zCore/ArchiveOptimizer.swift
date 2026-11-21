@@ -372,7 +372,8 @@ public struct ArchiveOptimizer: Sendable {
                 let dictionary = lzma.split(separator: ":").first { $0.hasPrefix("d=") }.map { String($0.dropFirst(2)) } ?? "1536m"
                 let mem = max(1, min(settings.ppmdMemoryMB, SmartPlan.maxPPMdMemoryMB))
                 if job.soloThreads >= 4,
-                   Job.canBuildConcurrently(dictionary: dictionary, ppmdMB: mem, physicalMemory: physicalMemory) {
+                   Job.canBuildConcurrently(dictionary: dictionary, ppmdMB: mem, physicalMemory: physicalMemory,
+                                            settings: settings) {
                     // LZMA2 on one stream uses two threads and PPMd one: the two layouts are built side by side.
                     job.emit(.phase(.assembling))
                     async let splitSize = buildSplitLayer()

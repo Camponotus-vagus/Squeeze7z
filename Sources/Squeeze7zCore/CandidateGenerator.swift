@@ -286,7 +286,7 @@ public enum CandidateGenerator {
         let setting = Int64(min(max(settings.lzmaDictionaryMB, 1), 1536))
         var limit = (setting >= 128 ? max(setting, 256) : setting) * mebibyte
         let encoders = Int64(max(1, concurrentBuilds)) * Int64(blockThreads(forBytes: bytes, threads: threads))
-        let budget = Int64(clamping: physicalMemory / 2) / encoders
+        let budget = memoryBudget(physicalMemory: physicalMemory, settings: settings) / encoders
         while limit > mebibyte && limit > budget / 11 { limit /= 2 }
         var needed = mebibyte
         while needed < bytes && needed < limit { needed <<= 1 }
@@ -319,6 +319,13 @@ public enum CandidateGenerator {
     static func baseParams(forBytes bytes: Int64, settings: OptimizerSettings) -> LZMAParams {
         LZMAParams(dictionary: dictionaryString(forBytes: bytes, settings: settings),
                    fastBytes: min(max(settings.lzmaWordSize, 5), 273))
+    }
+
+    /// Memory one job may use for its encoders: half of the physical memory, shared by the jobs that run at the
+    /// same time (`parallelJobs`; the CLI runs one at a time). Encoders take about 11 times their dictionary.
+    /// Two jobs that each assumed half of a 32 GB Mac drove macOS into its memory compressor for hours.
+    static func memoryBudget(physicalMemory: UInt64, settings: OptimizerSettings) -> Int64 {
+        Int64(clamping: physicalMemory / 2) / Int64(max(1, min(settings.parallelJobs, 6)))
     }
 
     static func isPPMdAllowed(bytes: Int64, settings: OptimizerSettings) -> Bool {

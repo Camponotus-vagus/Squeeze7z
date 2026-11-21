@@ -150,7 +150,7 @@ import Testing
     // MARK: Dictionary scaling
 
     @Test func dictionaryFollowsTheDataUpToTheCap() {
-        let settings = OptimizerSettings()   // 128 MB
+        let settings = { var s = OptimizerSettings(); s.parallelJobs = 1; return s }()  // one job: the whole budget   // 128 MB
         func d(_ bytes: Int64, _ s: OptimizerSettings = settings, memory: UInt64 = 32 << 30, builds: Int = 1) -> String {
             CandidateGenerator.scaledDictionaryString(forBytes: bytes, settings: s, concurrentBuilds: builds, physicalMemory: memory)
         }
@@ -172,7 +172,7 @@ import Testing
     }
 
     @Test func dictionaryStaysWithinHalfOfPhysicalMemory() {
-        let settings = OptimizerSettings()
+        let settings = { var s = OptimizerSettings(); s.parallelJobs = 1; return s }()  // one job: the whole budget
         // 11x the dictionary must fit in half the memory: 4 GB -> 2 GB / 11 = 186 MB -> 128m.
         #expect(CandidateGenerator.scaledDictionaryString(forBytes: 310 << 20, settings: settings,
                                                           concurrentBuilds: 1, physicalMemory: 4 << 30) == "128m")
@@ -242,7 +242,7 @@ import Testing
     /// The encoder takes about 11 times its dictionary per chunk encoder in flight. Measured with the vendored 7zz
     /// on 1.64 GB and d=256m: 13.5 GB with default threads (chunks of 256 MB, five encoders), 2.7 GB with one stream.
     @Test func baselineOfALargeTreeFitsA16GBMac() {
-        let settings = OptimizerSettings()
+        let settings = { var s = OptimizerSettings(); s.parallelJobs = 1; return s }()  // one job: the whole budget
         let physical: UInt64 = 16 << 30
         let tree: Int64 = 1_640 << 20
         let scaled = CandidateGenerator.scaledLZMA(forBytes: tree, settings: settings, concurrentBuilds: 1,
@@ -261,7 +261,7 @@ import Testing
     }
 
     @Test func dataBeyondTheLargestChunkSharesTheMemoryBetweenItsEncoders() {
-        let settings = OptimizerSettings()
+        let settings = { var s = OptimizerSettings(); s.parallelJobs = 1; return s }()  // one job: the whole budget
         // 200 GB in 64 GB chunks: four encoders with 10 threads, one with 1 thread (or 2).
         func d(threads: Int) -> String {
             CandidateGenerator.scaledLZMA(forBytes: 200 << 30, settings: settings, concurrentBuilds: 1, threads: threads,

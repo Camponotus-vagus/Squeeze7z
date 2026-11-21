@@ -147,7 +147,10 @@ func runOptimize(_ args: [String]) async -> Int32 {
     guard !o.files.isEmpty else { fail("No input files or folders.\n\n\(usage)") }
     let tool: SevenZipTool
     do { tool = try SevenZipTool.locate() } catch { fail(error.localizedDescription) }
-    let optimizer = ArchiveOptimizer(tool: tool, settings: o.settings)
+    // Inputs run one after the other: each job may use the whole memory budget.
+    var settings = o.settings
+    settings.parallelJobs = 1
+    let optimizer = ArchiveOptimizer(tool: tool, settings: settings)
     optimizer.sweepStaleTemporaryFiles()
     let quiet = o.quiet || o.json
     var status: Int32 = 0

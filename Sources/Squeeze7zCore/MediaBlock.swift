@@ -60,7 +60,7 @@ struct MediaBlock: Sendable {
         var dictionary = mebibyte
         while dictionary < chunk { dictionary <<= 1 }
         let encoders = min(maxEncoders, max(1, (bytes + chunk - 1) / chunk))
-        let budget = Int64(clamping: physicalMemory / 2) / encoders
+        let budget = CandidateGenerator.memoryBudget(physicalMemory: physicalMemory, settings: settings) / encoders
         while dictionary > mebibyte && dictionary * 11 > budget { dictionary >>= 1 }
         let params = LZMAParams(dictionary: "\(dictionary / mebibyte)m", fastBytes: min(max(settings.lzmaWordSize, 5), 273),
                                 lc: compressible ? 4 : nil, blockSize: "\(chunk / mebibyte)m")
@@ -124,13 +124,14 @@ extension Job {
         }
     }
 
-    /// Whether two LZMA2 encoders with `dictionary` (plus PPMd's model) fit in half of the physical memory, so the
+    /// Whether two LZMA2 encoders with `dictionary` (plus PPMd's model) fit in the job's memory budget, so the
     /// baseline and the Smart split can be built at the same time.
-    static func canBuildConcurrently(dictionary: String, ppmdMB: Int, physicalMemory: UInt64) -> Bool {
+    static func canBuildConcurrently(dictionary: String, ppmdMB: Int, physicalMemory: UInt64,
+                                     settings: OptimizerSettings) -> Bool {
         let digits = dictionary.prefix { $0.isNumber }
         guard let value = Int64(digits) else { return false }
         let unit: Int64 = dictionary.hasSuffix("g") ? 1 << 30 : dictionary.hasSuffix("k") ? 1 << 10 : 1 << 20
         let needed = 2 * 11 * value * unit + Int64(ppmdMB) << 20
-        return needed <= Int64(clamping: physicalMemory / 2)
+        return needed <= CandidateGenerator.memoryBudget(physicalMemory: physicalMemory, settings: settings)
     }
 }

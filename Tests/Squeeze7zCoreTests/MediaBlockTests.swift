@@ -10,6 +10,7 @@ import Testing
     private func spec(_ bytes: Int64, threads: Int = 10, memory: UInt64 = 32 << 30, compressible: Bool = false,
                       configure: (inout OptimizerSettings) -> Void = { _ in }) -> String? {
         var s = OptimizerSettings()
+        s.parallelJobs = 1
         configure(&s)
         return MediaBlock.spec(forBytes: bytes, settings: s, threads: threads, physicalMemory: memory,
                                compressible: compressible)?.description
@@ -35,6 +36,14 @@ import Testing
         #expect(spec(2_000 * mib, compressible: true) == "LZMA2:d=256m:fb=64:lc=4:c=250m")
     }
 
+    @Test func parallelJobsShareTheMemory() {
+        // The case that thrashed: 10.6 GB of JPEGs that still compress, two jobs on a 32 GB Mac.
+        #expect(spec(10_600 * mib, compressible: true) == "LZMA2:d=256m:fb=64:lc=4:c=253m")
+        #expect(spec(10_600 * mib, compressible: true) { $0.parallelJobs = 2 } == "LZMA2:d=128m:fb=64:lc=4:c=253m")
+        // Five encoders x 11 x 128 MB = 7 GB per job: two jobs stay within half of 32 GB.
+        #expect(spec(10_600 * mib, compressible: true) { $0.parallelJobs = 4 } == "LZMA2:d=64m:fb=64:lc=4:c=253m")
+    }
+
     @Test func noMediaBlockWhenItCannotHelp() {
         #expect(spec(63 * mib) == nil)
         #expect(spec(240 * mib, threads: 3) == nil)
@@ -45,10 +54,17 @@ import Testing
     }
 
     @Test func concurrentBuildsNeedTheMemory() {
-        #expect(Job.canBuildConcurrently(dictionary: "256m", ppmdMB: 256, physicalMemory: 32 * gib))
-        #expect(!Job.canBuildConcurrently(dictionary: "256m", ppmdMB: 256, physicalMemory: 8 * gib))
-        #expect(Job.canBuildConcurrently(dictionary: "64m", ppmdMB: 256, physicalMemory: 8 * gib))
-        #expect(!Job.canBuildConcurrently(dictionary: "x", ppmdMB: 256, physicalMemory: 32 * gib))
+        var one = OptimizerSettings()
+        one.parallelJobs = 1
+        let two = OptimizerSettings()   // the app default: two jobs at once
+        #expect(Job.canBuildConcurrently(dictionary: "256m", ppmdMB: 256, physicalMemory: 32 * gib, settings: one))
+        #expect(!Job.canBuildConcurrently(dictionary: "256m", ppmdMB: 256, physicalMemory: 8 * gib, settings: one))
+        #expect(Job.canBuildConcurrently(dictionary: "64m", ppmdMB: 256, physicalMemory: 8 * gib, settings: one))
+        #expect(!Job.canBuildConcurrently(dictionary: "x", ppmdMB: 256, physicalMemory: 32 * gib, settings: one))
+        // Two jobs share the budget: on 16 GB each job has 4 GB, too little for 2 x 11 x 256 MB.
+        #expect(Job.canBuildConcurrently(dictionary: "256m", ppmdMB: 256, physicalMemory: 16 * gib, settings: one))
+        #expect(!Job.canBuildConcurrently(dictionary: "256m", ppmdMB: 256, physicalMemory: 16 * gib, settings: two))
+        #expect(Job.canBuildConcurrently(dictionary: "128m", ppmdMB: 256, physicalMemory: 16 * gib, settings: two))
     }
 
     private func noise(_ count: Int) -> Data {
