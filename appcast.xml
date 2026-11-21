@@ -6,6 +6,20 @@
     <description>Updates of Squeeze7z.</description>
     <language>en</language>
     <item>
+      <title>Squeeze7z 0.2.1</title>
+      <pubDate>Sat, 21 Nov 2026 22:23:58 +0000</pubDate>
+      <sparkle:version>0.2.1</sparkle:version>
+      <sparkle:shortVersionString>0.2.1</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[
+<p>Live progress, and large photo archives no longer stall.</p>
+<ul><li>While a job runs, its row shows the step it is on (extracting, compressing, verifying) with a percentage, the files done out of the total, the file being worked on and the time left for that step.</li><li>While it compresses, the Saved column shows an estimate in grey (≈) of what the new archive will save against the original. The exact figure replaces it once the archive is verified.</li><li>Fixed: two large photo archives processed side by side could take most of the Mac's memory and slow to a crawl. Each job now sizes its encoders for its share of the memory. On two 7z archives of JPEG photos (3.1 GB and 10.6 GB), jobs that were still running after 50 minutes now finish in about 3 and 7 minutes.</li></ul>
+<p>Copies of 0.2.0 offer this update by themselves (Squeeze7z → Check for Updates…). From 0.1.x, download it once by hand.</p>
+<p>Requirements: macOS 26 or later, Apple Silicon. The app is ad-hoc signed and not notarized: after the first attempt to open a downloaded copy, go to System Settings → Privacy &amp; Security and click "Open Anyway". Updates installed by the app do not need this step.</p>
+      ]]></description>
+      <enclosure url="https://github.com/Camponotus-vagus/Squeeze7z/releases/download/v0.2.1/Squeeze7z.zip" type="application/octet-stream" sparkle:edSignature="dQDNmBM7zmEib2pQhJcXtRLB2TPHiflB/pGTdNa2PfWRoeGH9eKjbluRYQLzVQk5e5UuVe/FH9RdHxLzT36MDw==" length="6525515" />
+    </item>
+    <item>
       <title>Squeeze7z 0.2.0</title>
       <pubDate>Sat, 21 Nov 2026 19:48:32 +0000</pubDate>
       <sparkle:version>0.2.0</sparkle:version>
