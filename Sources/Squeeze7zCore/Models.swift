@@ -277,6 +277,47 @@ public enum OptimizationEvent: Sendable {
     case trialProgress(done: Int, total: Int)
     /// Free-form log line (shown in the report / console).
     case log(String)
+    /// Progress inside the current long step (extraction, compression, verification), about twice a second.
+    case stepProgress(StepProgress)
+}
+
+/// One progress line of a running 7zz: percent of its work, files done, the file it is on.
+struct ToolProgress: Sendable, Equatable {
+    var percent: Int
+    var files: Int?
+    var currentFile: String?
+}
+
+/// Where a job is inside one long step, for a live status line.
+public struct StepProgress: Sendable, Equatable {
+    public enum Step: String, Sendable, Equatable {
+        case extracting, compressing, compressingMedia, verifying
+
+        public var displayName: String {
+            switch self {
+            case .extracting: "Extracting"
+            case .compressing: "Compressing"
+            case .compressingMedia: "Compressing media"
+            case .verifying: "Verifying"
+            }
+        }
+    }
+
+    public var step: Step
+    /// 0...1 of this step.
+    public var fraction: Double
+    public var filesDone: Int?
+    public var filesTotal: Int?
+    /// Path inside the archive or folder, as 7zz prints it.
+    public var currentFile: String?
+    /// Share saved so far while compressing (0.03 = 3%), estimated from what has been written; nil when unknown.
+    public var estimatedSaving: Double?
+
+    public init(step: Step, fraction: Double, filesDone: Int? = nil, filesTotal: Int? = nil,
+                currentFile: String? = nil, estimatedSaving: Double? = nil) {
+        self.step = step; self.fraction = fraction; self.filesDone = filesDone; self.filesTotal = filesTotal
+        self.currentFile = currentFile; self.estimatedSaving = estimatedSaving
+    }
 }
 
 public enum OptimizationOutcome: String, Sendable, Codable {

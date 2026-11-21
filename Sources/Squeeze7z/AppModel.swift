@@ -300,8 +300,10 @@ final class AppModel {
             return
         }
         let limit = max(1, min(settings.parallelJobs, 6))
+        // Jobs that will run side by side from now: each one sizes its encoders for its share of the memory.
+        let alongside = min(limit, runningCount + jobs.filter { $0.status == .queued }.count)
         while runningCount < limit, let next = jobs.first(where: { $0.status == .queued }) {
-            launch(next, tool: tool)
+            launch(next, tool: tool, alongside: alongside)
         }
         if runningCount == 0 && !jobs.contains(where: { $0.status == .queued }) {
             queueActive = false
@@ -309,9 +311,11 @@ final class AppModel {
         updateActivity()
     }
 
-    private func launch(_ job: Job, tool: SevenZipTool) {
+    private func launch(_ job: Job, tool: SevenZipTool, alongside: Int) {
         job.begin()
-        let snapshot = storedSettings
+        var snapshot = storedSettings
+        // The engine reads parallelJobs only for its memory budget: a job alone may use all of it.
+        snapshot.parallelJobs = max(1, alongside)
         let url = job.url
         let (stream, continuation) = AsyncStream.makeStream(of: OptimizationEvent.self)
 

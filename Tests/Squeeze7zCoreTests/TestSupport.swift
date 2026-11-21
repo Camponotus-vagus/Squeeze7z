@@ -205,6 +205,7 @@ enum TestSupport {
         var phases: [OptimizationPhase] { events.compactMap { if case .phase(let p) = $0 { p } else { nil } } }
         var logs: [String] { events.compactMap { if case .log(let s) = $0 { s } else { nil } } }
         var progress: [(Int, Int)] { events.compactMap { if case .trialProgress(let d, let t) = $0 { (d, t) } else { nil } } }
+        var steps: [StepProgress] { events.compactMap { if case .stepProgress(let p) = $0 { p } else { nil } } }
     }
 
     static func entries(in directory: URL) -> [String] {

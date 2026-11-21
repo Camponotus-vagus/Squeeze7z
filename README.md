@@ -32,6 +32,8 @@ From version 0.2.0 the app updates itself. It checks GitHub for new versions (on
 2. Click Start.
 3. A folder becomes `Folder.7z` next to it. An archive becomes `name_optimized.7z` next to it, unless you choose in Settings to replace the original, which then goes to the Trash.
 
+While a job runs, its row shows the step it is on (extracting, compressing, verifying) with a percentage, the files done out of the total, the file being worked on and the time left for that step. While it compresses, the Saved column shows an estimate in grey (≈) of what it is saving; the exact figure replaces it once the archive is verified.
+
 Double-click a finished row to see what was done: which method each group of files got, how long it took, and the log.
 
 ## Is it better than 7-Zip or Keka?

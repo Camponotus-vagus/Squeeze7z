@@ -23,6 +23,12 @@ final class Job: Identifiable {
     var phase: OptimizationPhase?
     var trialsDone = 0
     var trialsTotal = 0
+    /// The long step under way (extraction, compression, verification), with its live numbers.
+    var step: StepProgress?
+    var stepStartedAt: Date?
+    /// Seconds left in the step as last estimated, and when.
+    private(set) var stepRemaining: TimeInterval?
+    private(set) var stepRemainingAt: Date?
     var result: OptimizationResult?
     var errorMessage: String?
     var log: [String] = []
@@ -78,6 +84,7 @@ final class Job: Identifiable {
         phase = nil
         trialsDone = 0
         trialsTotal = 0
+        clearStep()
         errorMessage = nil
         result = nil
         log.removeAll()
@@ -88,6 +95,7 @@ final class Job: Identifiable {
         phase = nil
         trialsDone = 0
         trialsTotal = 0
+        clearStep()
         errorMessage = nil
         result = nil
         cancelRequested = false
@@ -101,13 +109,47 @@ final class Job: Identifiable {
         switch event {
         case .phase(let p):
             phase = p
+            clearStep()
             appendLog("Phase: \(p.displayName)")
         case .trialProgress(let done, let total):
             trialsDone = done
             trialsTotal = total
         case .log(let line):
             appendLog(line)
+        case .stepProgress(let p):
+            updateStep(p, now: .now)
         }
+    }
+
+    /// Seconds left in the current step at `date`, once there is enough of it to tell.
+    func remaining(at date: Date) -> TimeInterval? {
+        guard let stepRemaining, let stepRemainingAt else { return nil }
+        return max(0, stepRemaining - date.timeIntervalSince(stepRemainingAt))
+    }
+
+    func updateStep(_ p: StepProgress, now: Date) {
+        if step?.step != p.step || stepStartedAt == nil {
+            stepStartedAt = now
+            stepRemaining = nil
+            stepRemainingAt = nil
+        }
+        step = p
+        guard let started = stepStartedAt else { return }
+        let elapsed = now.timeIntervalSince(started)
+        // Too early, the rate says little: wait for 2% of the step and 8 seconds.
+        guard p.fraction >= 0.02, p.fraction < 1, elapsed >= 8 else { return }
+        let measured = elapsed * (1 - p.fraction) / p.fraction
+        // Smoothed against the previous estimate, carried forward to now.
+        let smoothed = remaining(at: now).map { 0.7 * $0 + 0.3 * measured } ?? measured
+        stepRemaining = smoothed
+        stepRemainingAt = now
+    }
+
+    private func clearStep() {
+        step = nil
+        stepStartedAt = nil
+        stepRemaining = nil
+        stepRemainingAt = nil
     }
 
     /// Combined size of the regular files in a folder (links are not followed).

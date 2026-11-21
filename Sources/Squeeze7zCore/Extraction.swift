@@ -4,7 +4,8 @@ extension SevenZipTool {
     /// Extracts `archive` into `directory` (created if needed). Symbolic links are restored with their
     /// exact stored targets: 7zz rewrites absolute link targets and refuses links that leave the
     /// extraction root, so those are re-created from the archive data afterwards.
-    func extract(_ archive: URL, listing: ArchiveListing, to directory: URL) async throws {
+    func extract(_ archive: URL, listing: ArchiveListing, to directory: URL,
+                 progress: (@Sendable (ToolProgress) -> Void)? = nil) async throws {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let hasLinks = listing.entries.contains { $0.isSymlink }
         var args = ["x"] + Self.quietSwitches + ["-spd", "-scsUTF-8", "-o" + directory.path]
@@ -13,7 +14,7 @@ extension SevenZipTool {
         // that the listing does not show. They are metadata, not content, and cannot go into a 7z.
         if Self.skipsAlternateStreams(listing) { args.append("-sns-") }
         args.append(archive.standardizedFileURL.path)
-        try await runChecked(args)
+        try await runChecked(args, progress: progress)
         if hasLinks { try await restoreSymlinks(archive: archive, listing: listing, root: directory) }
     }
 

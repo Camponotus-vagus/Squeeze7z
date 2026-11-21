@@ -89,6 +89,10 @@ public struct ArchiveOptimizer: Sendable {
         let volumes = VolumeSet.volumes(of: source)
         let originalBytes = volumes.reduce(Int64(0)) { $0 + Job.fileSize($1) }
 
+        func extractionProgress(_ listing: ArchiveListing) -> @Sendable (ToolProgress) -> Void {
+            job.progressHandler(Job.ProgressPlan(step: .extracting, files: listing.entries.filter { !$0.isDirectory }.count))
+        }
+
         // 1. Inspect
         job.emit(.phase(.inspecting))
         let listing = try await tool.list(source)
@@ -114,7 +118,7 @@ public struct ArchiveOptimizer: Sendable {
             let outer = job.work.appendingPathComponent("outer", isDirectory: true)
             let unpacked = regularEntries[0].size > 0 ? regularEntries[0].size : originalBytes * 5
             try checkDiskSpace(unpacked: unpacked)
-            try await tool.extract(source, listing: listing, to: outer)
+            try await tool.extract(source, listing: listing, to: outer, progress: extractionProgress(listing))
             // readdir, not FileManager: the inner name may start with "._", which FileManager hides.
             let names = try TreeScanner.listDirectory(outer.path)
             guard names.count == 1 else { throw OptimizerError.notAnArchive("unexpected content in \(source.lastPathComponent)") }
@@ -125,7 +129,7 @@ public struct ArchiveOptimizer: Sendable {
                 try SourceChecks.ensureSafe(inner)
                 try checkDiskSpace(unpacked: inner.entries.reduce(0) { $0 + $1.size }, alreadyUsed: unpacked)
                 job.log("tar inside \(listing.format): \(inner.entries.filter { !$0.isDirectory }.count) files")
-                try await tool.extract(extracted[0], listing: inner, to: job.root)
+                try await tool.extract(extracted[0], listing: inner, to: job.root, progress: extractionProgress(inner))
                 comparisonListing = inner
                 try? fm.removeItem(at: outer)
             } else {
@@ -134,7 +138,7 @@ public struct ArchiveOptimizer: Sendable {
             }
         } else {
             try checkDiskSpace(unpacked: listing.entries.reduce(0) { $0 + $1.size })
-            try await tool.extract(source, listing: listing, to: job.root)
+            try await tool.extract(source, listing: listing, to: job.root, progress: extractionProgress(listing))
         }
         var snapshot = try await TreeScanner.scan(root: job.root)
         for path in Array(snapshot.files.keys) + Array(snapshot.directories.keys) + snapshot.emptyDirectories
@@ -339,7 +343,10 @@ public struct ArchiveOptimizer: Sendable {
             }
             let suffix = media == nil ? "" : MediaBlock.strategySuffix
             let baselineURL = job.work.appendingPathComponent("baseline_0.7z")
-            let baselineBlocks = restPaths.isEmpty ? [] : [Job.Block(list: restList, spec: baseSpec, autoFilters: true)]
+            let baselineBlocks = restPaths.isEmpty ? [] : [Job.Block(
+                list: restList, spec: baseSpec, autoFilters: true,
+                progress: Job.ProgressPlan(step: .compressing, files: restPaths.count, inputBytes: restBytes,
+                                           output: baselineURL))]
             let baselineName = restPaths.isEmpty ? "parallel media block" : "whole-archive \(baseSpec)" + suffix
             @Sendable func buildBaselineLayer() async throws -> Int64 {
                 try await job.buildLayered(base: nil, blocks: baselineBlocks, directories: layerDirectories, into: baselineURL)
@@ -353,9 +360,24 @@ public struct ArchiveOptimizer: Sendable {
                 job.emit(.trialProgress(done: done, total: plannedTotal))
             }
             if let plan = smartPlan {
+                let lzma = baseSpec.coders.first ?? ""
+                let dictionary = lzma.split(separator: ":").first { $0.hasPrefix("d=") }.map { String($0.dropFirst(2)) } ?? "1536m"
+                let mem = max(1, min(settings.ppmdMemoryMB, SmartPlan.maxPPMdMemoryMB))
+                let concurrent = job.soloThreads >= 4
+                    && Job.canBuildConcurrently(dictionary: dictionary, ppmdMB: mem, physicalMemory: physicalMemory,
+                                                settings: settings)
                 let splitURL = job.work.appendingPathComponent("smart.7z")
-                var splitBlocks = [Job.Block(list: plan.textList, spec: plan.textSpec, autoFilters: false)]
-                if let list = plan.restList { splitBlocks.append(Job.Block(list: list, spec: plan.restSpec, autoFilters: true)) }
+                // Built alongside the baseline, the split stays silent: the baseline's progress stands for both.
+                var splitBlocks = [Job.Block(
+                    list: plan.textList, spec: plan.textSpec, autoFilters: false,
+                    progress: concurrent ? nil : Job.ProgressPlan(step: .compressing, files: plan.text.files.count,
+                                                                  inputBytes: plan.text.totalBytes, output: splitURL))]
+                if let list = plan.restList, let rest = plan.rest {
+                    splitBlocks.append(Job.Block(
+                        list: list, spec: plan.restSpec, autoFilters: true,
+                        progress: concurrent ? nil : Job.ProgressPlan(step: .compressing, files: rest.files.count,
+                                                                      inputBytes: rest.totalBytes, output: splitURL)))
+                }
                 let blocks = splitBlocks
                 @Sendable func buildSplitLayer() async throws -> Int64 {
                     try await job.buildLayered(base: nil, blocks: blocks, directories: layerDirectories, into: splitURL)
@@ -368,12 +390,7 @@ public struct ArchiveOptimizer: Sendable {
                     done += 1
                     job.emit(.trialProgress(done: done, total: plannedTotal))
                 }
-                let lzma = baseSpec.coders.first ?? ""
-                let dictionary = lzma.split(separator: ":").first { $0.hasPrefix("d=") }.map { String($0.dropFirst(2)) } ?? "1536m"
-                let mem = max(1, min(settings.ppmdMemoryMB, SmartPlan.maxPPMdMemoryMB))
-                if job.soloThreads >= 4,
-                   Job.canBuildConcurrently(dictionary: dictionary, ppmdMB: mem, physicalMemory: physicalMemory,
-                                            settings: settings) {
+                if concurrent {
                     // LZMA2 on one stream uses two threads and PPMd one: the two layouts are built side by side.
                     job.emit(.phase(.assembling))
                     async let splitSize = buildSplitLayer()
@@ -392,9 +409,12 @@ public struct ArchiveOptimizer: Sendable {
                 // keepSmallest left one archive: both layouts get the same media block, so the smaller one wins.
                 let target = archives[0].url
                 try await job.appendDirectories(directoryStage, to: target)
+                let plan = Job.ProgressPlan(step: .compressingMedia, files: media.files.count, inputBytes: media.bytes,
+                                            output: target, chunkBytes: media.chunkBytes,
+                                            prior: media.probeSaving)
                 try await job.tool.runChecked(job.addArguments(archive: target, list: media.list, spec: media.spec,
                                                                filtersOff: true, threads: job.soloThreadSwitch),
-                                              currentDirectory: job.root)
+                                              currentDirectory: job.root, progress: job.progressHandler(plan))
                 archives[0].size = Job.fileSize(target)
                 job.log("Media block (\(media.files.count) files, \(media.bytes) bytes) as parallel chunks \(media.spec): archive \(archives[0].size) bytes")
                 done += 1
@@ -408,7 +428,9 @@ public struct ArchiveOptimizer: Sendable {
             try await Job.runBounded(limit: 1, count: specs.count,
                                      work: { i -> Int64 in
                 try await job.buildBaseline(spec: specs[i], list: allList, hasEntries: !allPaths.isEmpty,
-                                            directories: directoryStage, into: urls[i])
+                                            directories: directoryStage, into: urls[i],
+                                            progress: Job.ProgressPlan(step: .compressing, files: allPaths.count,
+                                                                       inputBytes: totalBytes, output: urls[i]))
                 return Job.fileSize(urls[i])
             }, onResult: { i, size in
                 archives.append((urls[i], size, "whole-archive \(specs[i])"))

@@ -5,8 +5,27 @@ struct ProcessOutput: Sendable {
     var exitCode: Int32
     var standardOutput: Data
     var standardError: Data
+    /// 7zz ran with `-bsp1`: standard output holds progress segments to be left out when it is read.
+    var hadProgress = false
 
-    var outputText: String { String(decoding: standardOutput, as: UTF8.self) }
+    /// Standard output without 7zz's progress segments (`-bsp1`). Those redraw themselves with backspaces and
+    /// carry file names, which must not be read as messages ("Wrong password" in a file name, for instance).
+    /// Only the segments go: a message 7zz prints right after erasing the progress, on the same line (the
+    /// password prompt), stays. Output of runs without progress is left as it is (a name may hold a backspace).
+    var outputText: String {
+        let text = String(decoding: standardOutput, as: UTF8.self)
+        guard hadProgress, text.contains("\u{8}") else { return text }
+        return text.split(separator: "\n", omittingEmptySubsequences: false).compactMap { line -> String? in
+            guard line.contains("\u{8}") else { return String(line) }
+            let kept = line.split(separator: "\u{8}").filter { segment in
+                let trimmed = segment.trimmingCharacters(in: .whitespaces)
+                if trimmed.isEmpty { return false }
+                return trimmed.wholeMatch(of: /\d{1,3}%.*/) == nil && trimmed.wholeMatch(of: /\d+M Scan.*/) == nil
+            }
+            let joined = kept.joined().trimmingCharacters(in: .whitespaces)
+            return joined.isEmpty ? nil : joined
+        }.joined(separator: "\n")
+    }
     var errorText: String { String(decoding: standardError, as: UTF8.self) }
 
     /// Text useful in an error message: stderr plus the tail of stdout (7zz prints some errors on stdout).
@@ -72,8 +91,11 @@ enum ProcessRunner {
     /// Runs `executable` with stdin attached to /dev/null. Standard output and error go to temporary
     /// files, so neither pipe can fill up and block the child. Cancelling the calling task terminates
     /// the child and throws `OptimizerError.cancelled`.
+    /// `onOutputTail`, when given, receives the last 2 KB of standard output about twice a second while the child
+    /// runs, whenever it has grown (7zz's progress lines).
     static func run(executable: URL, arguments: [String], currentDirectory: URL? = nil,
-                    environment: [String: String] = [:]) async throws -> ProcessOutput {
+                    environment: [String: String] = [:],
+                    onOutputTail: (@Sendable (Data) -> Void)? = nil) async throws -> ProcessOutput {
         if Task.isCancelled { throw OptimizerError.cancelled }
 
         let ioDir = Self.outputDirectory
@@ -95,8 +117,32 @@ enum ProcessRunner {
             try? FileManager.default.removeItem(at: errURL)
         }
 
+        let poller: Task<Void, Never>? = onOutputTail.map { handler in
+            Task.detached(priority: .utility) {
+                var lastSize: UInt64 = 0
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .milliseconds(500))
+                    guard !Task.isCancelled, let reader = try? FileHandle(forReadingFrom: outURL) else { continue }
+                    defer { try? reader.close() }
+                    guard let size = try? reader.seekToEnd(), size > lastSize else { continue }
+                    lastSize = size
+                    try? reader.seek(toOffset: size > 2048 ? size - 2048 : 0)
+                    if let tail = try? reader.readToEnd(), !tail.isEmpty { handler(tail) }
+                }
+            }
+        }
+        defer { poller?.cancel() }
+
         let canceller = ProcessCanceller()
-        let exitCode: Int32 = try await withTaskCancellationHandler {
+        // The poller is stopped and awaited before returning: a late progress line must not reach the job after
+        // the next phase has started.
+        func stopPoller() async {
+            poller?.cancel()
+            await poller?.value
+        }
+        let exitCode: Int32
+        do {
+        exitCode = try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Int32, Error>) in
                 let process = Process()
                 process.executableURL = executable
@@ -127,6 +173,11 @@ enum ProcessRunner {
         } onCancel: {
             canceller.cancel()
         }
+        } catch {
+            await stopPoller()
+            throw error
+        }
+        await stopPoller()
 
         if canceller.isCancelled || Task.isCancelled { throw OptimizerError.cancelled }
         let out = (try? Data(contentsOf: outURL)) ?? Data()

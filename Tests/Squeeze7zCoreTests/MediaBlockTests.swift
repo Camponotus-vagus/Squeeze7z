@@ -39,8 +39,8 @@ import Testing
     @Test func parallelJobsShareTheMemory() {
         // The case that thrashed: 10.6 GB of JPEGs that still compress, two jobs on a 32 GB Mac.
         #expect(spec(10_600 * mib, compressible: true) == "LZMA2:d=256m:fb=64:lc=4:c=253m")
-        #expect(spec(10_600 * mib, compressible: true) { $0.parallelJobs = 2 } == "LZMA2:d=128m:fb=64:lc=4:c=253m")
         // Five encoders x 11 x 128 MB = 7 GB per job: two jobs stay within half of 32 GB.
+        #expect(spec(10_600 * mib, compressible: true) { $0.parallelJobs = 2 } == "LZMA2:d=128m:fb=64:lc=4:c=253m")
         #expect(spec(10_600 * mib, compressible: true) { $0.parallelJobs = 4 } == "LZMA2:d=64m:fb=64:lc=4:c=253m")
     }
 
@@ -117,9 +117,13 @@ import Testing
         var s = OptimizerSettings()
         s.mode = mode
         s.outputDirectory = dir
+        let log = TestSupport.EventLog()
         let result = try await ArchiveOptimizer(tool: try TestSupport.tool(), settings: s, temporaryDirectory: dir)
-            .optimize(folder) { _ in }
+            .optimize(folder, progress: log.add)
         #expect(result.strategy.hasSuffix(MediaBlock.strategySuffix), "strategy \(result.strategy)")
+        // The media block reports its progress: fractions in range, the file count of the block.
+        let media = log.steps.filter { $0.step == .compressingMedia }
+        #expect(media.allSatisfy { (0...1).contains($0.fraction) && $0.filesTotal == 9 })
         #expect(result.groups.first?.group.id == "media")
         #expect(result.groups.first?.group.files.count == 9)
         #expect(result.groups.first?.winner.description.contains(":c=") == true)
@@ -129,5 +133,37 @@ import Testing
         try TestSupport.extract(output, into: extracted)
         #expect(try TestSupport.fingerprint(extracted.appendingPathComponent("Photos")) == expected)
         #expect(!FileManager.default.fileExists(atPath: dir.appendingPathComponent("work").path))
+    }
+
+    // MARK: Progress lines of 7zz
+
+    @Test func progressLinesAreParsed() {
+        let b = String(repeating: "\u{8}", count: 19)
+        let add = "  0M Scan  ./\(b)             \(b)  0%\u{8}\u{8}\u{8}\u{8}    \u{8}\u{8}\u{8}\u{8}  9% 3 + in/f12.jpg\(b)"
+            + "                   \(b) 99% 30 + in/f9 copy.jpg\(b)                   \(b)"
+        #expect(SevenZipTool.parseProgress(Data(add.utf8)) == ToolProgress(percent: 99, files: 30, currentFile: "in/f9 copy.jpg"))
+        #expect(SevenZipTool.parseProgress(Data(" 42% 12 - photos/a.jpg\(b)".utf8))
+                == ToolProgress(percent: 42, files: 12, currentFile: "photos/a.jpg"))
+        #expect(SevenZipTool.parseProgress(Data(" 37%\u{8}\u{8}\u{8}\u{8}".utf8)) == ToolProgress(percent: 37, files: nil, currentFile: nil))
+        #expect(SevenZipTool.parseProgress(Data("  0M Scan\(b)".utf8)) == nil)
+        #expect(SevenZipTool.parseProgress(Data()) == nil)
+    }
+
+    @Test func progressLinesAreNotReadAsMessages() {
+        // A file named like an error must not make the archive look encrypted, nor end up in an error message.
+        let out = "\n  12% 3 + docs/Wrong password.txt\u{8}\u{8}\u{8}\u{8}\nEverything is Ok\n"
+        let output = ProcessOutput(exitCode: 2, standardOutput: Data(out.utf8), standardError: Data(), hadProgress: true)
+        #expect(!output.outputText.contains("Wrong password"))
+        #expect(!SevenZipTool.looksEncrypted(output))
+        #expect(output.outputText.contains("Everything is Ok"))
+        // A message printed right after the progress is erased, on the same line, is kept.
+        let erase = String(repeating: "\u{8}", count: 8)
+        let prompt = "  37% 2 + a.txt\(erase)        \(erase)Enter password (will not be echoed):"
+        let asked = ProcessOutput(exitCode: 2, standardOutput: Data(prompt.utf8), standardError: Data(), hadProgress: true)
+        #expect(asked.outputText == "Enter password (will not be echoed):")
+        #expect(SevenZipTool.looksEncrypted(asked))
+        // Without progress (a listing), a backspace in a file name is left alone.
+        let listing = ProcessOutput(exitCode: 0, standardOutput: Data("Path = a\u{8}b.txt\n".utf8), standardError: Data())
+        #expect(listing.outputText == "Path = a\u{8}b.txt\n")
     }
 }

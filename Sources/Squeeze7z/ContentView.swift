@@ -154,7 +154,7 @@ struct JobTable: View {
         @Bindable var model = model
         Table(model.jobs, selection: $model.selection) {
             TableColumn("Name") { job in NameCell(job: job) }
-                .width(min: 180, ideal: 250)
+                .width(min: 180, ideal: 220)
             TableColumn("Format") { job in Text(job.formatLabel).foregroundStyle(.secondary) }
                 .width(min: 50, ideal: 64, max: 100)
             TableColumn("Original") { job in
@@ -167,7 +167,7 @@ struct JobTable: View {
                 .width(min: 70, ideal: 84, max: 120)
                 .alignment(.trailing)
             TableColumn("Saved") { job in SavedCell(job: job) }
-                .width(min: 110, ideal: 140, max: 220)
+                .width(min: 100, ideal: 125, max: 220)
                 .alignment(.trailing)
             TableColumn("Trials") { job in TrialsCell(job: job) }
                 .width(min: 50, ideal: 64, max: 90)
@@ -176,7 +176,7 @@ struct JobTable: View {
                 .width(min: 56, ideal: 72, max: 100)
                 .alignment(.trailing)
             TableColumn("Status") { job in StatusCell(job: job) }
-                .width(min: 170, ideal: 200)
+                .width(min: 200, ideal: 290)
         }
         .contextMenu(forSelectionType: Job.ID.self) { ids in
             if !ids.isEmpty {
@@ -205,7 +205,17 @@ private struct NameCell: View {
     let job: Job
     var body: some View {
         Label {
-            Text(job.name).lineLimit(1).truncationMode(.middle)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(job.name).lineLimit(1).truncationMode(.middle)
+                if job.status == .running, !job.cancelRequested, let file = job.step?.currentFile {
+                    // The file 7zz is on right now, last path component first so it survives truncation.
+                    Text((file as NSString).lastPathComponent)
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+            }
         } icon: {
             Image(systemName: "doc.zipper").foregroundStyle(.secondary)
         }
@@ -233,6 +243,13 @@ private struct SavedCell: View {
             Text(Fmt.saved(result.savedBytes, of: result.originalBytes))
                 .monospacedDigit()
                 .foregroundStyle(.green)
+        } else if job.status == .running, !job.cancelRequested, let saving = job.step?.estimatedSaving {
+            // Live estimate while compressing: grey, with "≈", until the verified result replaces it.
+            Text("≈ \(Fmt.percent(saving))")
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+                .contentTransition(.numericText())
+                .help("Estimated from the part compressed so far. The exact figure appears when the archive has been verified.")
         } else {
             Text("-").foregroundStyle(.tertiary)
         }
@@ -286,25 +303,69 @@ private struct StatusCell: View {
 
     private var runningView: some View {
         HStack(spacing: 8) {
-            if job.trialsTotal > 0 {
+            if let step = job.step, !job.cancelRequested {
+                ProgressView(value: step.fraction)
+                    .progressViewStyle(.linear)
+                    .frame(width: 70)
+            } else if job.trialsTotal > 0 {
                 ProgressView(value: Double(job.trialsDone), total: Double(job.trialsTotal))
                     .progressViewStyle(.linear)
                     .frame(width: 70)
             } else {
                 ProgressView().controlSize(.small)
             }
-            Text(runningText)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .contentTransition(.numericText())
+            VStack(alignment: .leading, spacing: 1) {
+                Text(runningText)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .contentTransition(.numericText())
+                if job.step != nil, !job.cancelRequested {
+                    // Redrawn every second so the time left counts down between progress updates.
+                    TimelineView(.periodic(from: .now, by: 1)) { context in
+                        Text(detailText(at: context.date))
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                            .lineLimit(1)
+                            .monospacedDigit()
+                    }
+                }
+            }
         }
+        .help(helpText)
     }
 
     private var runningText: String {
         if job.cancelRequested { return "Stopping…" }
+        if let step = job.step {
+            // Percent first: when the column is narrow, the end of the text is what gets cut.
+            return "\(step.fraction.formatted(.percent.precision(.fractionLength(0)))) · \(step.step.displayName)"
+        }
         // The Trials column already shows x/y, so the status only names the phase.
         return job.phase?.displayName ?? "Starting"
+    }
+
+    /// "1,234/20,535 files · about 12 min left"
+    private func detailText(at date: Date) -> String {
+        var parts: [String] = []
+        if let step = job.step, let total = step.filesTotal, total > 0 {
+            let done = min(step.filesDone ?? 0, total)
+            parts.append("\(done.formatted())/\(total.formatted()) files")
+        }
+        if let left = job.remaining(at: date) {
+            parts.append(Fmt.remaining(left))
+        } else if job.step != nil {
+            parts.append("estimating time…")
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    private var helpText: String {
+        guard let step = job.step, !job.cancelRequested else { return runningText }
+        var lines = ["\(step.step.displayName): \(Fmt.percent(step.fraction)) of this step"]
+        if let file = step.currentFile { lines.append("Now: \(file)") }
+        lines.append("The time left is for this step; verification follows the compression.")
+        return lines.joined(separator: "\n")
     }
 }
 

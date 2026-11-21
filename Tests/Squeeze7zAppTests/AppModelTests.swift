@@ -385,3 +385,24 @@ enum TestDirectory {
         return url
     }
 }
+
+/// The live status of a running job: time left in the current step.
+@Suite struct LiveProgressTests {
+    @Test @MainActor func timeLeftFollowsTheRateOfTheStep() {
+        let job = Job(url: URL(fileURLWithPath: "/tmp/x.zip"), originalBytes: 100)
+        let start = Date(timeIntervalSinceReferenceDate: 1_000)
+        job.updateStep(StepProgress(step: .compressingMedia, fraction: 0), now: start)
+        // Too early to tell: under 8 seconds, or under 2% of the step.
+        job.updateStep(StepProgress(step: .compressingMedia, fraction: 0.2), now: start + 5)
+        #expect(job.remaining(at: start + 5) == nil)
+        job.updateStep(StepProgress(step: .compressingMedia, fraction: 0.25), now: start + 30)
+        #expect(job.remaining(at: start + 30) == 90)      // 30 s for a quarter: 90 s to go
+        #expect(job.remaining(at: start + 40) == 80)      // counts down between updates
+        // A new step starts its own clock.
+        job.updateStep(StepProgress(step: .verifying, fraction: 0.5), now: start + 50)
+        #expect(job.remaining(at: start + 50) == nil)
+        #expect(Fmt.remaining(30) == "under a minute left")
+        #expect(Fmt.remaining(12 * 60) == "about 12 min left")
+        #expect(Fmt.remaining(80 * 60) == "about 1 h 20 min left")
+    }
+}

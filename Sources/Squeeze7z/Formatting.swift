@@ -23,6 +23,15 @@ enum Fmt {
         return "\(s)s"
     }
 
+    /// "about 12 min left", rounded the way a person would say it.
+    static func remaining(_ seconds: TimeInterval) -> String {
+        let minutes = Int((seconds / 60).rounded())
+        if seconds < 50 { return "under a minute left" }
+        if minutes < 60 { return "about \(max(1, minutes)) min left" }
+        let h = minutes / 60, m = (minutes % 60) / 5 * 5
+        return m == 0 ? "about \(h) h left" : "about \(h) h \(m) min left"
+    }
+
     /// "12.3 MB (24.5%)"
     static func saved(_ saved: Int64, of original: Int64) -> String {
         guard original > 0 else { return bytes(saved) }

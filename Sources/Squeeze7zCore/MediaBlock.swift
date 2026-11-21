@@ -22,6 +22,10 @@ struct MediaBlock: Sendable {
     let list: URL
     /// Whether the probe found that the files still compress (fewer, larger chunks are used then).
     let compressible: Bool
+    /// Share the probe saved, shown as the live estimate until enough of the block has been written.
+    let probeSaving: Double
+    /// Size of each independent chunk; the output is written a whole chunk at a time.
+    let chunkBytes: Int64
 
     /// nil when the tree has too few compressed bytes, the machine too few threads, or the setting is off.
     static func make(groups: [FileGroup], snapshot: TreeSnapshot, job: Job, physicalMemory: UInt64) async throws -> MediaBlock? {
@@ -33,13 +37,14 @@ struct MediaBlock: Sendable {
         let files = media.flatMap(\.files).sorted()
         let saving = try await job.probeSaving(files: files, snapshot: snapshot)
         let compressible = saving >= compressibleSaving
-        guard let spec = spec(forBytes: bytes, settings: settings, threads: job.soloThreads,
-                              physicalMemory: physicalMemory, compressible: compressible) else { return nil }
+        guard let layout = layout(forBytes: bytes, settings: settings, threads: job.soloThreads,
+                                  physicalMemory: physicalMemory, compressible: compressible) else { return nil }
         let list = job.listsDir.appendingPathComponent("media.txt")
         try ListFile.write(files, to: list)
         job.log(String(format: "Media probe: %.2f%% saved on a sample, %@", saving * 100,
                        compressible ? "few large chunks" : "one chunk per two cores"))
-        return MediaBlock(files: files, bytes: bytes, spec: spec, list: list, compressible: compressible)
+        return MediaBlock(files: files, bytes: bytes, spec: layout.spec, list: list, compressible: compressible,
+                          probeSaving: saving, chunkBytes: layout.chunkBytes)
     }
 
     /// LZMA2 in independent chunks, a dictionary that covers one chunk, within half of the physical memory for
@@ -50,6 +55,12 @@ struct MediaBlock: Sendable {
     /// chunk starts its model from scratch, which costs size on such data. `lc=4` helps there.
     static func spec(forBytes bytes: Int64, settings: OptimizerSettings, threads: Int,
                      physicalMemory: UInt64, compressible: Bool) -> MethodSpec? {
+        layout(forBytes: bytes, settings: settings, threads: threads, physicalMemory: physicalMemory,
+               compressible: compressible)?.spec
+    }
+
+    static func layout(forBytes bytes: Int64, settings: OptimizerSettings, threads: Int, physicalMemory: UInt64,
+                       compressible: Bool) -> (spec: MethodSpec, chunkBytes: Int64, encoders: Int64)? {
         let maxEncoders = Int64(threads / 2)
         guard settings.parallelMediaBlocks, !settings.mode.runsTrials, maxEncoders >= 2, bytes >= minBytes else { return nil }
         let mebibyte: Int64 = 1 << 20
@@ -64,7 +75,7 @@ struct MediaBlock: Sendable {
         while dictionary > mebibyte && dictionary * 11 > budget { dictionary >>= 1 }
         let params = LZMAParams(dictionary: "\(dictionary / mebibyte)m", fastBytes: min(max(settings.lzmaWordSize, 5), 273),
                                 lc: compressible ? 4 : nil, blockSize: "\(chunk / mebibyte)m")
-        return CandidateGenerator.lzma2(params)
+        return (CandidateGenerator.lzma2(params), chunk, encoders)
     }
 }
 
@@ -100,6 +111,8 @@ extension Job {
         let list: URL
         let spec: MethodSpec
         let autoFilters: Bool
+        /// Reported as `.stepProgress` while 7zz builds the block (nil: silent, e.g. a layout built alongside another).
+        var progress: ProgressPlan? = nil
     }
 
     /// Builds `archive` as a copy of `base` (an APFS clone when possible) with `blocks` appended in order, then
@@ -112,7 +125,8 @@ extension Job {
             for block in blocks {
                 try await tool.runChecked(addArguments(archive: archive, list: block.list, spec: block.spec,
                                                        filtersOff: filtersOff || !block.autoFilters,
-                                                       threads: soloThreadSwitch), currentDirectory: root)
+                                                       threads: soloThreadSwitch), currentDirectory: root,
+                                          progress: block.progress.map(progressHandler))
             }
             try await appendDirectories(directories, to: archive)
             if attempt == 0, !filtersOff, !settings.allowModernFilters, blocks.contains(where: \.autoFilters),

@@ -158,6 +158,7 @@ func runOptimize(_ args: [String]) async -> Int32 {
     for path in o.files {
         let url = URL(fileURLWithPath: path)
         if !quiet { err("== \(url.lastPathComponent)") }
+        let lastStep = StepMarker()
         do {
             let result = try await optimizer.optimize(url) { event in
                 if quiet { return }
@@ -165,6 +166,13 @@ func runOptimize(_ args: [String]) async -> Int32 {
                 case .phase(let p): err("[\(p.displayName)]")
                 case .trialProgress(let d, let t): if d == t || d % 10 == 0 { err("  trial \(d)/\(t)") }
                 case .log(let s): err("  \(s)")
+                case .stepProgress(let p):
+                    // One line per step and tenth, so a log stays readable.
+                    guard lastStep.advance(to: "\(p.step.rawValue)-\(Int(p.fraction * 10))") else { return }
+                    var line = "  \(p.step.displayName.lowercased()) \(Int((p.fraction * 100).rounded()))%"
+                    if let done = p.filesDone, let total = p.filesTotal { line += " (\(done)/\(total) files)" }
+                    if let saving = p.estimatedSaving { line += String(format: ", about %.1f%% saved", saving * 100) }
+                    err(line)
                 }
             }
             results.append(result)
@@ -262,3 +270,17 @@ for sig in [SIGINT, SIGTERM, SIGHUP] {
 let status = await work.value
 if signalRecord.received != 0 { exit(128 + signalRecord.received) }
 exit(status)
+
+/// The last progress step printed, shared with the event closure.
+final class StepMarker: @unchecked Sendable {
+    private let lock = NSLock()
+    private var last = ""
+
+    /// True when `key` differs from the last one printed (and records it).
+    func advance(to key: String) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        guard key != last else { return false }
+        last = key
+        return true
+    }
+}

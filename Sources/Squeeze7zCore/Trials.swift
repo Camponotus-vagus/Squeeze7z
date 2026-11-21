@@ -173,11 +173,11 @@ struct Job: Sendable {
     /// Builds the whole tree as one archive with a single method (7-Zip's own filters stay enabled).
     /// `list` holds the files and links; `hasEntries` is false for a tree made only of directories.
     func buildBaseline(spec: MethodSpec, list: URL, hasEntries: Bool, directories: DirectoryStage?,
-                       into archive: URL) async throws {
+                       into archive: URL, progress: ProgressPlan? = nil) async throws {
         try? FileManager.default.removeItem(at: archive)
         if hasEntries {
             let args = addArguments(archive: archive, list: list, spec: spec, filtersOff: false, threads: soloThreadSwitch)
-            try await tool.runChecked(args, currentDirectory: root)
+            try await tool.runChecked(args, currentDirectory: root, progress: progress.map(progressHandler))
             // 7zz picks a branch filter by itself; the ARM64 and RISC-V ones need 7-Zip 23+ to extract.
             if !settings.allowModernFilters, Self.usesModernFilter(try await tool.list(archive)) {
                 try? FileManager.default.removeItem(at: archive)
@@ -199,12 +199,72 @@ struct Job: Sendable {
         }
     }
 
+    // MARK: Progress
+
+    /// What a 7zz run reports while it works.
+    struct ProgressPlan: Sendable {
+        var step: StepProgress.Step
+        var files: Int?
+        /// Bytes the run compresses, for the live saving estimate (with `output`).
+        var inputBytes: Int64? = nil
+        /// The archive being written; 7zz writes an update to `<archive>.tmp`.
+        var output: URL? = nil
+        /// Size of the independent LZMA2 chunks (media block): output is written a whole chunk at a time.
+        var chunkBytes: Int64? = nil
+        /// Saving shown until enough has been written to measure one (the media probe).
+        var prior: Double? = nil
+    }
+
+    /// Turns 7zz progress lines into `.stepProgress` events.
+    ///
+    /// Files done: 7zz counts the files it has read, which runs ahead of the compression (encoders read ahead)
+    /// and behind it when testing; only extraction counts them as it goes. Compression and verification derive
+    /// the count from the share of the data done instead.
+    ///
+    /// Saving: what has been written against the input it stands for. Parallel chunks are written whole, so
+    /// the written size tells how many chunks are complete; a single stream is written as it goes. Until enough
+    /// is written, `prior` (the media probe) is shown.
+    func progressHandler(_ plan: ProgressPlan) -> @Sendable (ToolProgress) -> Void {
+        let base = plan.output.map { Job.fileSize($0) } ?? 0
+        let emit = self.emit
+        return { line in
+            let fraction = Double(line.percent) / 100
+            var filesDone = line.files
+            var currentFile = line.currentFile
+            if plan.step != .extracting, let total = plan.files {
+                filesDone = min(total, Int((Double(total) * fraction).rounded()))
+                // Once 7zz has read every file, the name it shows is the last one read, not the one being
+                // compressed: better none than a stale one.
+                if plan.step != .verifying, (line.files ?? 0) >= total, fraction < 1 { currentFile = nil }
+            }
+            var saving = plan.prior
+            if let output = plan.output, let input = plan.inputBytes, input > 0 {
+                let written = max(Job.fileSize(output), Job.fileSize(output.appendingPathExtension("tmp"))) - base
+                if written > 0, let chunk = plan.chunkBytes, chunk > 0 {
+                    let chunks = Double((input + chunk - 1) / chunk)
+                    let perChunk = Double(chunk) * (1 - (plan.prior ?? 0))
+                    let complete = min(max((Double(written) / perChunk).rounded(), 1), chunks)
+                    let covered = min(complete * Double(chunk), Double(input))
+                    saving = 1 - Double(written) / covered
+                } else if written > 0, plan.chunkBytes == nil {
+                    let read = Double(input) * fraction
+                    if read > 16 * 1_048_576 { saving = 1 - Double(written) / read }
+                }
+                saving = saving.map { min(max($0, -0.5), 1) }
+            }
+            emit(.stepProgress(StepProgress(step: plan.step, fraction: fraction, filesDone: filesDone,
+                                            filesTotal: plan.files, currentFile: currentFile,
+                                            estimatedSaving: saving)))
+        }
+    }
+
     // MARK: Verification
 
     /// `7zz t` plus a listing comparison against the extracted tree (paths, sizes, CRC32).
     func verify(archive: URL, snapshot: TreeSnapshot) async throws {
         do {
-            try await tool.runChecked(["t"] + SevenZipTool.quietSwitches + ["-spd", archive.path])
+            try await tool.runChecked(["t"] + SevenZipTool.quietSwitches + ["-spd", archive.path],
+                                      progress: progressHandler(ProgressPlan(step: .verifying, files: snapshot.files.count)))
         } catch let OptimizerError.toolFailed(_, code, stderr) {
             throw OptimizerError.verificationFailed("7zz t failed (\(code)): \(stderr)")
         }
