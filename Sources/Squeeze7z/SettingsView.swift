@@ -23,6 +23,8 @@ struct SettingsView: View {
 /// Where results go, the safety net and the reset.
 struct GeneralSettings: View {
     @Environment(AppModel.self) private var model
+    private let updates = Updates.shared
+    private static let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
 
     var body: some View {
         @Bindable var model = model
@@ -74,6 +76,16 @@ struct GeneralSettings: View {
                 Toggle("Keep temporary files (debugging)", isOn: $model.settings.keepTempFiles)
             }
 
+            if updates.isAvailable {
+                Section("Updates") {
+                    @Bindable var updates = updates
+                    Toggle("Check for updates automatically", isOn: $updates.automaticallyChecks)
+                    LabeledContent("Squeeze7z \(Self.version)") {
+                        Button("Check Now") { updates.checkForUpdates() }
+                    }
+                }
+            }
+
             Section {
                 LabeledContent("All settings") {
                     Button("Reset to Defaults") { model.settings = OptimizerSettings() }
@@ -81,7 +93,7 @@ struct GeneralSettings: View {
             }
         }
         .formStyle(.grouped)
-        .frame(height: 440)
+        .frame(height: updates.isAvailable ? 540 : 440)
         .animation(.smooth(duration: 0.25), value: model.settings.outputMode)
     }
 

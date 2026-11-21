@@ -11,8 +11,13 @@ set -euo pipefail
 
 readonly APP_NAME="Squeeze7z"
 readonly BUNDLE_ID="org.zermat.squeeze7z"
-readonly VERSION="0.1.1"
-readonly BUILD_NUMBER="1"
+# SQUEEZE7Z_VERSION and SQUEEZE7Z_FEED_URL override these, for scripts/release.sh and for local update tests.
+readonly VERSION="${SQUEEZE7Z_VERSION:-0.2.0}"
+# Sparkle compares CFBundleVersion, so it follows the version.
+readonly BUILD_NUMBER="${VERSION}"
+readonly FEED_URL="${SQUEEZE7Z_FEED_URL:-https://raw.githubusercontent.com/Camponotus-vagus/Squeeze7z/main/appcast.xml}"
+# Public half of the EdDSA key that signs update archives (the private half is in the release machine's Keychain).
+readonly UPDATE_PUBLIC_KEY="ZH3hWymCV33kYDAZcNTlkdrX0qnzzQNPveJsOeZuvq8="
 readonly MIN_MACOS="26.0"
 readonly COPYRIGHT="Copyright 2026 Zermat. 7-Zip engine by Igor Pavlov (LGPL, unRAR restriction)."
 
@@ -22,6 +27,7 @@ readonly BUILD_DIR="${REPO_ROOT}/build"
 readonly APP_DIR="${BUILD_DIR}/${APP_NAME}.app"
 readonly CONTENTS_DIR="${APP_DIR}/Contents"
 readonly MACOS_DIR="${CONTENTS_DIR}/MacOS"
+readonly FRAMEWORKS_DIR="${CONTENTS_DIR}/Frameworks"
 readonly RESOURCES_DIR="${CONTENTS_DIR}/Resources"
 readonly ENGINE_SRC="${REPO_ROOT}/Vendor/7zip/7zz"
 readonly LICENSE_SRC="${REPO_ROOT}/Vendor/7zip/License.txt"
@@ -66,7 +72,8 @@ require_file "${ICON_FALLBACK}"
 
 # SQUEEZE7Z_APP_BUNDLE leaves out the #filePath lookups of a checkout, so the app does not carry the path of the
 # machine it was built on. The bundle finds 7zz and its license as resources.
-readonly APP_FLAGS=(-Xswiftc -DSQUEEZE7Z_APP_BUNDLE)
+# The rpath lets the executable find Sparkle.framework in Contents/Frameworks.
+readonly APP_FLAGS=(-Xswiftc -DSQUEEZE7Z_APP_BUNDLE -Xlinker -rpath -Xlinker @executable_path/../Frameworks)
 
 if [[ "${skip_build}" == false ]]; then
     log "Building ${APP_NAME} (release)"
@@ -86,6 +93,17 @@ cp "${EXECUTABLE}" "${MACOS_DIR}/${APP_NAME}"
 # Drop the debug symbol table: it names the source files by their absolute path on the build machine.
 strip -S "${MACOS_DIR}/${APP_NAME}"
 chmod 755 "${MACOS_DIR}/${APP_NAME}"
+# SwiftPM also adds absolute rpaths into the build folder: they would not exist on another Mac and would name
+# this one's folders.
+otool -l "${MACOS_DIR}/${APP_NAME}" | awk '$1 == "path" && $2 !~ /^@/ { print $2 }' | while read -r rpath; do
+    install_name_tool -delete_rpath "${rpath}" "${MACOS_DIR}/${APP_NAME}"
+done
+
+log "Embedding Sparkle.framework"
+require_file "${BIN_DIR}/Sparkle.framework/Versions/B/Sparkle"
+mkdir -p "${FRAMEWORKS_DIR}"
+# ditto keeps the framework's symlinks and executable bits, which Sparkle needs.
+ditto "${BIN_DIR}/Sparkle.framework" "${FRAMEWORKS_DIR}/Sparkle.framework"
 
 cat > "${CONTENTS_DIR}/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -150,6 +168,10 @@ cat > "${CONTENTS_DIR}/Info.plist" <<PLIST
     </array>
     <key>NSHumanReadableCopyright</key>
     <string>${COPYRIGHT}</string>
+    <key>SUFeedURL</key>
+    <string>${FEED_URL}</string>
+    <key>SUPublicEDKey</key>
+    <string>${UPDATE_PUBLIC_KEY}</string>
 </dict>
 </plist>
 PLIST
@@ -176,8 +198,9 @@ chmod 755 "${RESOURCES_DIR}/7zz"
 cp "${LICENSE_SRC}" "${RESOURCES_DIR}/7zip-License.txt"
 
 log "Signing (ad-hoc)"
-# Sign the nested engine first, then the bundle as a whole.
+# Sign the nested engine and Sparkle (with its helper apps and XPC services) first, then the bundle as a whole.
 codesign --force -s - "${RESOURCES_DIR}/7zz"
+codesign --force --deep -s - "${FRAMEWORKS_DIR}/Sparkle.framework"
 codesign --force --deep -s - "${APP_DIR}"
 codesign -v --strict --verbose=2 "${APP_DIR}"
 

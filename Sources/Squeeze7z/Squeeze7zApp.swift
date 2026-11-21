@@ -5,6 +5,8 @@ import AppKit
 struct Squeeze7zApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     private let model = AppModel.shared
+    // Created at launch so Sparkle can schedule its automatic checks.
+    private let updates = Updates.shared
 
     var body: some Scene {
         Window("Squeeze7z", id: "main") {
@@ -28,6 +30,8 @@ struct AppCommands: Commands {
     var body: some Commands {
         CommandGroup(replacing: .appInfo) {
             Button("About Squeeze7z") { AboutPanel.show(engine: model.engine) }
+            Button("Check for Updates…") { Updates.shared.checkForUpdates() }
+                .disabled(!Updates.shared.isAvailable)
         }
         CommandGroup(replacing: .newItem) {
             Button("Add Archives or Folders…") { model.showImporter = true }

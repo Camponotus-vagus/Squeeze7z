@@ -22,6 +22,10 @@ The app is not notarized by Apple, so the first launch is blocked. Open it once,
 xattr -dr com.apple.quarantine /Applications/Squeeze7z.app
 ```
 
+### Updates
+
+From version 0.2.0 the app updates itself. It checks GitHub for new versions (on the second launch it asks whether to do that automatically), shows what changed, and installs the update and relaunches when you agree. Use Squeeze7z → Check for Updates… to check by hand, and Settings → General to turn the automatic check on or off. Updates are signed: the app installs only archives signed with the project's key. Versions 0.1.x have no updater, so moving to 0.2.0 is a manual download, once.
+
 ## Using it
 
 1. Drag folders or archives onto the window (or onto the Dock icon), or use the + button.
@@ -101,6 +105,8 @@ scripts/build-app.sh --install   # build/Squeeze7z.app, copied to ~/Applications
 scripts/build-cli.sh             # build/squeeze7z-cli
 ```
 
+`scripts/release.sh VERSION NOTES.md` publishes a release: it builds the app from a fresh clone, signs the zip with the EdDSA key in the login Keychain, creates the GitHub release and then adds it to `appcast.xml`, the feed the app reads. Updates use [Sparkle](https://sparkle-project.org).
+
 The app is written in Swift 6 and SwiftUI. All compression is done by the official 7-Zip console program `7zz` (version 26.06, with the RAR codecs), which ships in `Vendor/7zip` and is copied into the app bundle. Homebrew's `7zz` works as a fallback, but it cannot read RAR files.
 
 How a job runs:
@@ -116,7 +122,7 @@ How a job runs:
 
 Squeeze7z takes its idea from Ultra7z Archive Optimizer by supercompression.org, a Windows program. No code, name or artwork comes from it, and this project is not affiliated with it.
 
-The compression engine is 7-Zip by Igor Pavlov, included unchanged.
+The compression engine is 7-Zip by Igor Pavlov, included unchanged. Updates are handled by Sparkle (MIT license), also included unchanged.
 
 ## License
 
