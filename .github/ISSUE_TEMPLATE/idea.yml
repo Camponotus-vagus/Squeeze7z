@@ -1,0 +1,11 @@
+name: Idea or request
+description: Something Squeeze7z could do, or do better.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you'd like
+      description: What you are trying to do and how Squeeze7z gets in the way today.
+    validations:
+      required: true

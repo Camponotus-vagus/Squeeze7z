@@ -10,6 +10,8 @@ Squeeze7z packs folders into 7z files, and repacks existing archives (zip, rar, 
 
 The output is a normal 7z file. It opens with 7-Zip, Keka and the Archive Utility built into macOS.
 
+Squeeze7z was written with a lot of help from an AI coding assistant (Claude Code). I decided what it should do and which trade-offs to accept, and I tested every release on my own archives against Keka and plain 7-Zip (numbers and scripts in [BENCHMARKS.md](BENCHMARKS.md)). The compression is done by the official 7-Zip engine, unchanged. Squeeze7z picks the methods and checks the result before keeping it.
+
 ## Download
 
 Get `Squeeze7z.zip` from the [latest release](https://github.com/Camponotus-vagus/Squeeze7z/releases/latest), unzip it and move `Squeeze7z.app` to Applications.
@@ -119,6 +121,16 @@ How a job runs:
 4. Build the candidate archives for the chosen mode and keep the smallest.
 5. Run `7zz t` on it and compare the path, size and CRC32 of every file with the extracted tree.
 6. Write it only if it passed and is smaller than the original.
+
+## Bugs and ideas
+
+So far Squeeze7z has been tested on my Macs and my archives, so reports from other machines are the most useful thing you can send. [Open an issue](https://github.com/Camponotus-vagus/Squeeze7z/issues/new/choose) with your macOS version, your Mac, the kind and size of the archive or folder, and the log from the report window (double-click the row). The log shows file and folder names: delete anything you'd rather not share. Please don't attach private archives; a description is enough to start.
+
+Pull requests are welcome too. For anything larger than a small fix, open an issue first so we can agree on the approach.
+
+## Support
+
+Squeeze7z is free and will stay free. If it saves you some disk space and you want to say thanks, you can do it on [Ko-fi](https://ko-fi.com/zermat) or [GitHub Sponsors](https://github.com/sponsors/Camponotus-vagus).
 
 ## Credits
 
