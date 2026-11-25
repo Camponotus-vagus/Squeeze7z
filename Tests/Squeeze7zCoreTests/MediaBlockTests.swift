@@ -144,6 +144,9 @@ import Testing
         #expect(SevenZipTool.parseProgress(Data(add.utf8)) == ToolProgress(percent: 99, files: 30, currentFile: "in/f9 copy.jpg"))
         #expect(SevenZipTool.parseProgress(Data(" 42% 12 - photos/a.jpg\(b)".utf8))
                 == ToolProgress(percent: 42, files: 12, currentFile: "photos/a.jpg"))
+        // `7zz t` marks the file under test with "T" and shortens long names with " . ".
+        #expect(SevenZipTool.parseProgress(Data(" 39% 36124 T data/raw/Fo . prima/IMG_1.jpg\(b)".utf8))
+                == ToolProgress(percent: 39, files: 36124, currentFile: "data/raw/Fo . prima/IMG_1.jpg"))
         #expect(SevenZipTool.parseProgress(Data(" 37%\u{8}\u{8}\u{8}\u{8}".utf8)) == ToolProgress(percent: 37, files: nil, currentFile: nil))
         #expect(SevenZipTool.parseProgress(Data("  0M Scan\(b)".utf8)) == nil)
         #expect(SevenZipTool.parseProgress(Data()) == nil)
