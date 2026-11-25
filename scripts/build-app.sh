@@ -12,7 +12,7 @@ set -euo pipefail
 readonly APP_NAME="Squeeze7z"
 readonly BUNDLE_ID="org.zermat.squeeze7z"
 # SQUEEZE7Z_VERSION and SQUEEZE7Z_FEED_URL override these, for scripts/release.sh and for local update tests.
-readonly VERSION="${SQUEEZE7Z_VERSION:-0.2.1}"
+readonly VERSION="${SQUEEZE7Z_VERSION:-0.2.2}"
 # Sparkle compares CFBundleVersion, so it follows the version.
 readonly BUILD_NUMBER="${VERSION}"
 readonly FEED_URL="${SQUEEZE7Z_FEED_URL:-https://raw.githubusercontent.com/Camponotus-vagus/Squeeze7z/main/appcast.xml}"
